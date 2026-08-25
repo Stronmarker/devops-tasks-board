@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: devops-tasks-board
+spec:
+  # NodePort : l'appel a l'API est fait par le JavaScript du navigateur,
+  # pas par le pod frontend. Le backend doit donc etre joignable depuis
+  # la machine hote, un ClusterIP ne suffirait pas.
+  # Repartition automatique sur les 2 replicas du Deployment.
+  type: NodePort
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      nodePort: 30300

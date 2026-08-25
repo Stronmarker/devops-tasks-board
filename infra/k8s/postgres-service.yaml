@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  labels:
+    app: postgres
+    app.kubernetes.io/part-of: devops-tasks-board
+spec:
+  # ClusterIP : la base ne doit JAMAIS etre joignable depuis l'exterieur
+  # du cluster. Seul le backend y accede, via le DNS interne
+  # postgres-service.default.svc.cluster.local:5432
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
