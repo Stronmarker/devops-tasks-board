@@ -1,6 +1,14 @@
+# Dependances
 node_modules/
+
+# Variables d'environnement (le .env.example reste versionne)
 .env
 .env.*
 !.env.example
+
+# Artefacts de build et de test
+dist/
 coverage/
-.DS_Storedist/
+
+# macOS
+.DS_Store
