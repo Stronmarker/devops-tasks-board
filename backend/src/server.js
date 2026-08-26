@@ -5,7 +5,19 @@ import pg from 'pg';
 const { Pool } = pg;
 const app = express();
 const port = Number(process.env.PORT || 3000);
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const connectionString = process.env.DATABASE_URL;
+
+// Render impose TLS sur les connexions PostgreSQL externes ; en local (Docker,
+// Kubernetes) la base est sur un reseau prive et n'en a pas besoin. On active
+// donc le SSL uniquement si l'URL le reclame, ou via DATABASE_SSL=true.
+// rejectUnauthorized: false -> Render presente un certificat auto-signe.
+const useSsl =
+  process.env.DATABASE_SSL === 'true' || /[?&]sslmode=require/.test(connectionString ?? '');
+
+export const pool = new Pool({
+  connectionString,
+  ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+});
 
 export function validateTaskPayload(payload) {
   const { title, status = 'todo' } = payload;
