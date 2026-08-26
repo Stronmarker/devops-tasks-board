@@ -11,4 +11,10 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
   },
+  // Vitest monte les composants dans jsdom : les tests s'executent donc dans
+  // un vrai DOM, sans navigateur, et restent utilisables dans la CI.
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.{js,jsx}'],
+  },
 });
