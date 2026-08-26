@@ -3,7 +3,7 @@ import express from 'express';
 import pg from 'pg';
 
 const { Pool } = pg;
-const app = express();
+export const app = express();
 const port = Number(process.env.PORT || 3000);
 const connectionString = process.env.DATABASE_URL;
 
