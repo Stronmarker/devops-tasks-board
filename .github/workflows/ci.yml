@@ -1,0 +1,201 @@
+# Pipeline CI/CD du projet DevOps Tasks Board.
+#
+# Enchainement : qualite -> tests -> images -> deploiement.
+# Chaque etage ne demarre que si le precedent est vert : une regression ne peut
+# pas atteindre la production. Le deploiement n'a lieu que sur `main`.
+name: CI/CD
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+# Un nouveau push sur une branche annule le run precedent encore en cours :
+# on evite de payer deux fois la meme verification.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # 1. Qualite du code : meme regles ESLint que celles executees en local.
+  lint:
+    name: Lint (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+
+      # `npm ci` (et non `npm install`) : installation stricte depuis le
+      # package-lock.json, donc des dependances identiques a chaque run.
+      - name: Installer les dependances
+        working-directory: ${{ matrix.package }}
+        run: npm ci
+
+      - name: Analyser le code
+        working-directory: ${{ matrix.package }}
+        run: npm run lint
+
+  # 2a. Tests backend : unitaires + integration sur une vraie base PostgreSQL,
+  #     demarree comme service a cote du job.
+  test-backend:
+    name: Tests backend
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: tasksdb
+          POSTGRES_USER: devops
+          POSTGRES_PASSWORD: devops
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U devops -d tasksdb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://devops:devops@localhost:5432/tasksdb
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # On rejoue le meme script d'initialisation qu'en local et en Kubernetes :
+      # les tests s'executent sur le schema reellement livre.
+      - name: Initialiser le schema de test
+        run: PGPASSWORD=devops psql -h localhost -U devops -d tasksdb -f infra/db/init_db.sql
+
+      - name: Installer les dependances
+        working-directory: backend
+        run: npm ci
+
+      - name: Executer les tests
+        working-directory: backend
+        run: npm test
+
+  # 2b. Tests frontend : rendu des composants dans jsdom, puis build de
+  #     production. Le build est un vrai garde-fou : c'est lui qui echoue si le
+  #     bundle ne compile plus.
+  test-frontend:
+    name: Tests frontend
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Installer les dependances
+        working-directory: frontend
+        run: npm ci
+
+      - name: Executer les tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Construire le bundle de production
+        working-directory: frontend
+        run: npm run build
+
+      - name: Publier le bundle comme artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
+
+  # 3. Images Docker : on verifie que les deux Dockerfiles construisent encore.
+  #    C'est ce qui garantit que le deploiement Kubernetes reste possible.
+  build-images:
+    name: Build des images Docker
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construire l'image backend
+        run: docker build -t tasks/backend:${{ github.sha }} ./backend
+
+      - name: Construire l'image frontend
+        run: docker build -t tasks/frontend:${{ github.sha }} ./frontend
+
+  # 4. Deploiement : uniquement depuis main, et seulement si tout le reste est
+  #    vert. Render redeploie sur appel du deploy hook, puis on verifie que le
+  #    service repond vraiment.
+  deploy:
+    name: Deploiement Render
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://devops-tasks-board-frontend-fkll.onrender.com
+    steps:
+      - name: Declencher le redeploiement du backend
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::notice::Secret RENDER_DEPLOY_HOOK_BACKEND absent : Render redeploie via son auto-deploy natif."
+            exit 0
+          fi
+          curl --fail --silent --show-error "$HOOK" > /dev/null
+          echo "Redeploiement backend demande."
+
+      - name: Declencher le redeploiement du frontend
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::notice::Secret RENDER_DEPLOY_HOOK_FRONTEND absent : Render redeploie via son auto-deploy natif."
+            exit 0
+          fi
+          curl --fail --silent --show-error "$HOOK" > /dev/null
+          echo "Redeploiement frontend demande."
+
+  # 5. Verification post-deploiement : un deploiement n'est reussi que si
+  #    l'application repond. On interroge /health, qui teste aussi la base.
+  #    La boucle absorbe le temps de build Render et le reveil du plan gratuit.
+  smoke-test:
+    name: Verification post-deploiement
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Interroger /health jusqu'a reponse saine
+        run: |
+          URL="https://devops-tasks-board-vhbm.onrender.com/health"
+          for attempt in $(seq 1 30); do
+            body=$(curl --silent --max-time 30 "$URL" || true)
+            echo "Tentative $attempt : ${body:-aucune reponse}"
+            case "$body" in
+              *'"status":"ok"'*)
+                echo "Backend en ligne et connecte a la base."
+                exit 0
+                ;;
+            esac
+            sleep 20
+          done
+          echo "::error::Le backend n'a pas repondu correctement apres 10 minutes."
+          exit 1
