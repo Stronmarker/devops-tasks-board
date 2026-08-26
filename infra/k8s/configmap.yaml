@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tasks-config
+  labels:
+    app.kubernetes.io/part-of: devops-tasks-board
+data:
+  # --- Frontend ---------------------------------------------------------
+  # URL appelee par le JavaScript DANS LE NAVIGATEUR, donc depuis l'exterieur
+  # du cluster : c'est le NodePort du backend, pas le DNS interne.
+  # (Docker Desktop mappe les nodePort sur localhost ; avec Minikube il
+  #  faudrait l'IP renvoyee par `minikube ip`.)
+  API_URL: "http://localhost:30300"
+
+  # --- Backend ----------------------------------------------------------
+  PORT: "3000"
+
+  # --- PostgreSQL (donnees NON sensibles uniquement) ---------------------
+  POSTGRES_DB: "tasksdb"
+  POSTGRES_USER: "devops"
+  # URL de la base SANS credentials : la version complete est dans le Secret.
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
