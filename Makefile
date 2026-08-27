@@ -12,8 +12,11 @@ export DATABASE_URL
 
 COMPOSE_FILE := infra/docker/docker-compose.yml
 COMPOSE := docker compose -f $(COMPOSE_FILE)
+K8S_DIR := infra/k8s
 
-.PHONY: help build start stop restart logs test test-frontend lint ci db-reset db-bootstrap db-suppr reset clean
+.PHONY: help build start stop restart logs test test-frontend lint ci \
+        k8s-images k8s-init k8s-start k8s-status k8s-logs k8s-stop k8s-clean \
+        db-reset db-bootstrap db-suppr reset clean
 
 help:
 	@echo "Cibles disponibles :"
@@ -26,6 +29,15 @@ help:
 	@echo "  make test          Tests backend (unitaires + integration)"
 	@echo "  make test-frontend Tests frontend (composants dans jsdom)"
 	@echo "  make ci            Rejouer localement les verifications du pipeline"
+	@echo ""
+	@echo "  Kubernetes :"
+	@echo "  make k8s-start     Construire les images, appliquer les manifests, attendre les pods"
+	@echo "  make k8s-status    Etat des pods, services et volumes"
+	@echo "  make k8s-logs      Suivre les logs du backend"
+	@echo "  make k8s-stop      Supprimer les deployments (le volume de donnees est conserve)"
+	@echo "  make k8s-clean     Tout supprimer, volume de donnees compris"
+	@echo ""
+	@echo "  Base de donnees :"
 	@echo "  make db-reset      Vider la base locale et rejouer les donnees de demo"
 	@echo "  make db-bootstrap  Restaurer une base distante : DATABASE_URL=... make db-bootstrap"
 	@echo "  make db-suppr      SUPPRIMER completement la base (confirmation au clavier)"
@@ -64,6 +76,53 @@ ci: lint test test-frontend
 # Vide la base LOCALE uniquement : la commande passe par docker compose, qui ne
 # connait que les conteneurs de cette machine. Render n'est joignable que par son
 # URL externe et n'est donc jamais atteint par une cible make.
+# --- Kubernetes -------------------------------------------------------------
+# Les images ne sont pas poussees sur un registre : elles sont construites dans
+# le demon Docker local, que le cluster Docker Desktop partage. C'est pourquoi
+# les manifests portent imagePullPolicy: IfNotPresent - sans cela Kubernetes
+# tenterait de les telecharger depuis Docker Hub et echouerait.
+k8s-images:
+	docker build -t tasks/backend:latest ./backend
+	docker build -t tasks/frontend:latest ./frontend
+
+# Le schema SQL est trop volumineux pour etre recopie a la main dans un
+# manifest. On genere la ConfigMap depuis le fichier source, ce qui garantit
+# que Kubernetes et Docker Compose initialisent la base avec le meme script.
+# --dry-run=client | kubectl apply : cree la ressource si absente, la met a jour
+# sinon, la ou un simple `kubectl create` echouerait au second appel.
+k8s-init:
+	kubectl create configmap postgres-init-sql \
+		--from-file=01-init.sql=infra/db/init_db.sql \
+		--dry-run=client -o yaml | kubectl apply -f -
+
+k8s-start: k8s-images k8s-init
+	kubectl apply -f $(K8S_DIR)
+	kubectl rollout status deployment/postgres --timeout=180s
+	kubectl rollout status deployment/backend  --timeout=180s
+	kubectl rollout status deployment/frontend --timeout=180s
+	@echo ""
+	@echo "  Interface : http://localhost:30080"
+	@echo "  API       : http://localhost:30300/health"
+
+k8s-status:
+	@kubectl get pods
+	@echo ""
+	@kubectl get svc,pvc
+
+k8s-logs:
+	kubectl logs -f deployment/backend
+
+# Conserve le PersistentVolumeClaim : les donnees survivent a l'arret, c'est
+# tout l'interet d'un volume persistant par rapport a un conteneur jetable.
+k8s-stop:
+	kubectl delete -f $(K8S_DIR) --ignore-not-found=true --wait=false
+	kubectl delete configmap postgres-init-sql --ignore-not-found=true
+	@echo "Deployments supprimes. Le volume de donnees est conserve (make k8s-clean pour l'effacer)."
+
+k8s-clean: k8s-stop
+	kubectl delete pvc postgres-pvc --ignore-not-found=true
+
+# --- Base de donnees --------------------------------------------------------
 db-reset:
 	$(COMPOSE) exec -T db psql -U devops -d tasksdb -c \
 		"TRUNCATE TABLE refresh_tokens, tasks, projects, users, teams RESTART IDENTITY CASCADE;"

@@ -257,6 +257,59 @@ déploiement n'est déclaré réussi que si l'application **et** sa base répond
 GitHub (*Settings → Secrets and variables → Actions*). En leur absence, le job signale
 que Render redéploie via son auto-deploy natif et n'échoue pas.
 
+## Lancement Kubernetes
+
+Le cluster utilisé est celui intégré à Docker Desktop (*Settings → Kubernetes → Enable*), qui
+remplace Minikube — voir la justification dans [docs/decisions.md](docs/decisions.md).
+
+```bash
+make k8s-start
+```
+
+La cible construit les deux images, génère la ConfigMap du schéma SQL, applique les manifests
+et attend que chaque déploiement soit prêt.
+
+- Interface : http://localhost:30080
+- API : http://localhost:30300/health
+
+| Commande | Action |
+| --- | --- |
+| `make k8s-start` | Construit, applique, attend les pods |
+| `make k8s-status` | Pods, services et volumes |
+| `make k8s-logs` | Suit les logs du backend |
+| `make k8s-stop` | Supprime les déploiements, **conserve** le volume de données |
+| `make k8s-clean` | Supprime tout, volume compris |
+
+### Ce que le cluster apporte, concrètement
+
+**Le backend tourne en deux exemplaires.** C'est cette contrainte qui a dicté le choix d'une
+authentification sans état : deux pods ne partagent pas leur mémoire, donc une session stockée
+côté serveur serait invisible d'un pod à l'autre. Vérifiable en deux commandes — un jeton émis
+par un pod est accepté par le second :
+
+```bash
+PODS=($(kubectl get pods -l app=backend -o jsonpath='{.items[*].metadata.name}'))
+# connexion exécutée dans le pod A, lecture des tâches dans le pod B → HTTP 200
+```
+
+**Un pod supprimé est remplacé sans coupure de service.** `kubectl delete pod` sur une des deux
+répliques : le contrôleur en recrée une, et l'API répond `200` pendant toute la bascule parce
+que la seconde réplique continue de servir.
+
+**La sonde `/health` détecte plus qu'un crash.** Elle exécute un `SELECT 1` : un backend vivant
+mais incapable de joindre la base est redémarré, ce que Docker Compose ne sait pas faire. Le
+`failureThreshold: 6` évite qu'une indisponibilité passagère de la base ne déclenche une boucle
+de redémarrages.
+
+**Les données survivent à l'arrêt** grâce au PersistentVolumeClaim : `make k8s-stop` puis
+`make k8s-start` retrouve la base intacte.
+
+### Le schéma SQL n'est pas dupliqué
+
+La ConfigMap `postgres-init-sql` est générée depuis `infra/db/init_db.sql` par `make k8s-init`.
+Docker Compose, Kubernetes et Render initialisent donc la base avec **le même fichier** : une
+modification du schéma se propage partout sans recopie manuelle.
+
 ## Variables d'environnement
 
 | Variable | Service | Rôle |
