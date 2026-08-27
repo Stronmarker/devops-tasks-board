@@ -60,8 +60,9 @@ export default function AuthScreen({ onAuthenticated }) {
 
     try {
       const body = Object.fromEntries(config.fields.map((field) => [field, values[field].trim()]));
-      const { token, user } = await apiFetch(config.path, { method: 'POST', body });
-      onAuthenticated({ token, user });
+      // La reponse contient la paire de jetons et l'utilisateur : on la
+      // transmet telle quelle, l'ecran n'a pas a connaitre sa composition.
+      onAuthenticated(await apiFetch(config.path, { method: 'POST', body }));
     } catch (submitError) {
       setError(submitError.message);
     } finally {

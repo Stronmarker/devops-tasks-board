@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from './App.jsx';
+import { clearSession } from './api.js';
 
 // Ces tests montent reellement l'application dans un DOM (jsdom). C'est ce type
 // de test qui detecte une page blanche : un `curl` sur l'index HTML renvoie 200
@@ -38,6 +39,9 @@ const mockApi = (routes) => {
 
 beforeEach(() => {
   localStorage.clear();
+  // Le jeton d'acces vit dans un module : il faut le reinitialiser entre deux
+  // tests, sinon une session fuit d'un test a l'autre.
+  clearSession();
 });
 
 afterEach(() => {
@@ -79,7 +83,13 @@ describe('Sans session', () => {
 
   it('ouvre le tableau apres une connexion reussie et conserve le jeton', async () => {
     mockApi({
-      'POST /auth/login': { body: { token: 'jeton-valide', user: { displayName: 'Chef', role: 'lead' } } },
+      'POST /auth/login': {
+        body: {
+          accessToken: 'acces-valide',
+          refreshToken: 'refresh-valide',
+          user: { displayName: 'Chef', role: 'lead' },
+        },
+      },
       '/team': { body: TEAM_LEAD },
       '/tasks': { body: TASKS },
     });
@@ -90,17 +100,30 @@ describe('Sans session', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Se connecter' }));
 
     await waitFor(() => expect(screen.getByText('Ecrire le pipeline')).toBeDefined());
-    expect(localStorage.getItem('tasks-board-token')).toBe('jeton-valide');
+
+    // Seul le jeton de rafraichissement est ecrit sur le disque ; le jeton
+    // d'acces reste en memoire du module.
+    expect(localStorage.getItem('tasks-board-refresh')).toBe('refresh-valide');
+    expect(localStorage.getItem('tasks-board-token')).toBeNull();
   });
 });
 
 describe('Session active', () => {
+  // Au chargement, le navigateur n'a que le jeton de rafraichissement : c'est
+  // l'etat reel apres un F5.
+  const REFRESH_OK = {
+    'POST /auth/refresh': {
+      body: { accessToken: 'acces-frais', refreshToken: 'refresh-suivant' },
+    },
+  };
+
   beforeEach(() => {
-    localStorage.setItem('tasks-board-token', 'jeton-valide');
+    localStorage.setItem('tasks-board-refresh', 'refresh-valide');
   });
 
   it('valide le jeton aupres du serveur avant d ouvrir le tableau', async () => {
     const fetchMock = mockApi({
+      ...REFRESH_OK,
       '/auth/me': { body: { user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } } },
       '/team': { body: TEAM_LEAD },
       '/tasks': { body: TASKS },
@@ -109,12 +132,21 @@ describe('Session active', () => {
 
     await waitFor(() => expect(screen.getByText('Ecrire le pipeline')).toBeDefined());
 
+    // Le rafraichissement precede toute requete metier, et /auth/me part avec
+    // le jeton d'acces tout juste obtenu.
+    const [, refreshOptions] = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith('/auth/refresh'),
+    );
+    expect(JSON.parse(refreshOptions.body)).toEqual({ refreshToken: 'refresh-valide' });
+
     const [, options] = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/auth/me'));
-    expect(options.headers.Authorization).toBe('Bearer jeton-valide');
+    expect(options.headers.Authorization).toBe('Bearer acces-frais');
+    expect(localStorage.getItem('tasks-board-refresh')).toBe('refresh-suivant');
   });
 
   it('repartit les taches par statut et compte chaque colonne', async () => {
     mockApi({
+      ...REFRESH_OK,
       '/auth/me': { body: { user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } } },
       '/team': { body: TEAM_LEAD },
       '/tasks': { body: TASKS },
@@ -129,6 +161,7 @@ describe('Session active', () => {
 
   it('montre le code d invitation au chef d equipe', async () => {
     mockApi({
+      ...REFRESH_OK,
       '/auth/me': { body: { user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } } },
       '/team': { body: TEAM_LEAD },
       '/tasks': { body: [] },
@@ -141,6 +174,7 @@ describe('Session active', () => {
 
   it('cache le code d invitation a un simple membre', async () => {
     mockApi({
+      ...REFRESH_OK,
       '/auth/me': { body: { user: { displayName: 'Membre', role: 'member' }, team: { name: 'Lab' } } },
       '/team': { body: { ...TEAM_LEAD, joinCode: null } },
       '/tasks': { body: [] },
@@ -152,22 +186,53 @@ describe('Session active', () => {
     expect(screen.queryByRole('button', { name: 'Generer un nouveau code' })).toBeNull();
   });
 
-  it('renvoie vers la connexion et efface le jeton si le serveur repond 401', async () => {
+  it('rejoue la requete apres un rafraichissement, sans deconnecter', async () => {
+    let premierAppel = true;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url, options = {}) => {
+        const path = String(url).replace('http://localhost:3000', '');
+        const ok = (body, status = 200) =>
+          Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(body) });
+
+        if (path === '/auth/refresh')
+          return ok({ accessToken: 'acces-frais', refreshToken: 'refresh-suivant' });
+        if (path === '/auth/me')
+          return ok({ user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } });
+        if (path === '/team') return ok(TEAM_LEAD);
+        if (path === '/tasks' && options.method !== 'POST') {
+          // Premiere lecture : le jeton d'acces vient d'expirer. La seconde,
+          // apres rafraichissement, doit reussir sans intervention.
+          if (premierAppel) {
+            premierAppel = false;
+            return ok({ error: 'Authentification requise' }, 401);
+          }
+          return ok(TASKS);
+        }
+        return ok({ error: 'Not found' }, 404);
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText('Ecrire le pipeline')).toBeDefined());
+    expect(screen.queryByRole('tab', { name: 'Se connecter' })).toBeNull();
+  });
+
+  it('renvoie vers la connexion quand le rafraichissement lui-meme echoue', async () => {
     mockApi({
-      '/auth/me': { body: { user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } } },
-      '/team': { body: TEAM_LEAD },
-      '/tasks': { status: 401, body: { error: 'Authentification requise' } },
+      'POST /auth/refresh': { status: 401, body: { error: 'Session expiree' } },
     });
     render(<App />);
 
-    // Un jeton expire en cours de session doit ramener a l'ecran de connexion,
-    // pas afficher un tableau vide sans explication.
+    // Session revoquee cote serveur : plus rien a tenter, on repart de zero.
     await waitFor(() => expect(screen.getByRole('tab', { name: 'Se connecter' })).toBeDefined());
-    expect(localStorage.getItem('tasks-board-token')).toBeNull();
+    expect(localStorage.getItem('tasks-board-refresh')).toBeNull();
   });
 
   it('envoie la couleur choisie lors de la creation d une tache', async () => {
     const fetchMock = mockApi({
+      ...REFRESH_OK,
       '/auth/me': { body: { user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } } },
       '/team': { body: TEAM_LEAD },
       '/tasks': { body: [] },
@@ -182,7 +247,9 @@ describe('Session active', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }));
 
     await waitFor(() => {
-      const call = fetchMock.mock.calls.find(([, options]) => options?.method === 'POST');
+      const call = fetchMock.mock.calls.find(
+        ([url, options]) => options?.method === 'POST' && String(url).endsWith('/tasks'),
+      );
       expect(JSON.parse(call[1].body)).toMatchObject({ title: 'Tache coloree', color: '#22C55E' });
     });
   });

@@ -2,7 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import AuthScreen from './AuthScreen.jsx';
 import Board from './Board.jsx';
 import TeamPanel from './TeamPanel.jsx';
-import { apiFetch, clearToken, getToken, setToken } from './api.js';
+import {
+  apiFetch,
+  clearSession,
+  hasSession,
+  logout as apiLogout,
+  refreshSession,
+  setSession as storeTokens,
+} from './api.js';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -10,7 +17,7 @@ export default function App() {
   // checking couvre l'instant ou un jeton existe mais n'a pas encore ete
   // valide : afficher l'ecran de connexion pendant ce temps ferait clignoter
   // l'interface a chaque rechargement.
-  const [checking, setChecking] = useState(Boolean(getToken()));
+  const [checking, setChecking] = useState(hasSession());
 
   const loadTeam = async () => {
     try {
@@ -23,28 +30,32 @@ export default function App() {
   // Identite stable : Board recoit cette fonction en dependance de son effet
   // de chargement, une nouvelle reference a chaque rendu le relancerait en boucle.
   const logout = useCallback(() => {
-    clearToken();
+    // La revocation cote serveur est lancee sans etre attendue : l'interface se
+    // ferme immediatement, et l'echec eventuel du reseau n'empeche pas de sortir.
+    apiLogout();
     setSession(null);
     setTeam(null);
   }, []);
 
-  const authenticate = async ({ token, user }) => {
-    setToken(token);
+  const authenticate = async ({ accessToken, refreshToken, user }) => {
+    storeTokens({ accessToken, refreshToken });
     setSession({ user });
     await loadTeam();
   };
 
   useEffect(() => {
-    if (!getToken()) return;
+    if (!hasSession()) return;
 
-    // Un jeton present ne prouve rien : il peut avoir expire ou avoir ete
-    // revoque cote base. On demande au serveur avant d'ouvrir le tableau.
-    apiFetch('/auth/me')
+    // Au chargement, seul le jeton de rafraichissement subsiste. On l'echange
+    // contre un jeton d'acces, puis on demande au serveur qui nous sommes : un
+    // jeton stocke ne prouve rien, il peut avoir ete revoque entre-temps.
+    refreshSession()
+      .then(() => apiFetch('/auth/me'))
       .then(async ({ user }) => {
         setSession({ user });
         await loadTeam();
       })
-      .catch(clearToken)
+      .catch(clearSession)
       .finally(() => setChecking(false));
   }, []);
 
