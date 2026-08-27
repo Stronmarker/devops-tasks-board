@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  collectFieldErrors,
   generateJoinCode,
   generateRefreshToken,
   hashPassword,
@@ -63,6 +64,23 @@ test('refuse une inscription incomplete', () => {
   assert.equal(validateCredentialsPayload({ ...valide, password: 'court' }), false);
   assert.equal(validateCredentialsPayload({ ...valide, displayName: 'A' }), false);
   assert.equal(validateCredentialsPayload({}), false);
+});
+
+test('signale precisement le champ fautif, pas un refus global', () => {
+  const base = { teamName: 'Mon equipe', displayName: 'Alex', email: 'alex@test.fr', password: 'Alex1234' };
+  const champs = (patch) => Object.keys(collectFieldErrors({ ...base, ...patch }, { withTeamName: true }));
+
+  assert.deepEqual(champs({}), [], 'une saisie correcte ne produit aucune erreur');
+  assert.deepEqual(champs({ password: 'motdepasse' }), ['password'], 'mot de passe sans chiffre');
+  assert.deepEqual(champs({ password: 'Alex123' }), ['password'], 'sept caracteres');
+  assert.deepEqual(champs({ email: 'alex@test' }), ['email'], 'domaine incomplet');
+  assert.deepEqual(champs({ displayName: 'A' }), ['displayName'], 'nom trop court');
+  assert.deepEqual(champs({ teamName: '' }), ['teamName'], "nom d'equipe vide");
+});
+
+test('cumule les erreurs quand plusieurs champs sont fautifs', () => {
+  const champs = collectFieldErrors({ displayName: '', email: 'nope', password: 'x' }, { withCode: true });
+  assert.deepEqual(Object.keys(champs).sort(), ['code', 'displayName', 'email', 'password']);
 });
 
 test('le mot de passe est hache et jamais stocke en clair', async () => {

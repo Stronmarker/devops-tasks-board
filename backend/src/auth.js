@@ -54,6 +54,29 @@ export function validateDisplayName(name) {
   return typeof name === 'string' && name.trim().length >= 2 && name.trim().length <= 120;
 }
 
+// Messages par champ. Un refus global ne dit pas quoi corriger : l'utilisateur
+// relit ses quatre champs sans savoir lequel pose probleme.
+export const FIELD_MESSAGES = {
+  teamName: "Le nom de l'equipe doit faire au moins 2 caracteres",
+  displayName: 'Votre nom doit faire au moins 2 caracteres',
+  email: 'Email invalide (exemple : vous@domaine.fr)',
+  password: `Mot de passe : ${PASSWORD_MIN_LENGTH} caracteres minimum, avec au moins une lettre et un chiffre`,
+  code: "Le code d'equipe doit faire exactement 6 chiffres",
+};
+
+// Renvoie un objet vide si tout est valide, sinon un message par champ fautif.
+export function collectFieldErrors(payload = {}, { withTeamName = false, withCode = false } = {}) {
+  const errors = {};
+
+  if (withTeamName && !validateDisplayName(payload.teamName)) errors.teamName = FIELD_MESSAGES.teamName;
+  if (withCode && !validateJoinCode(payload.code)) errors.code = FIELD_MESSAGES.code;
+  if (!validateDisplayName(payload.displayName)) errors.displayName = FIELD_MESSAGES.displayName;
+  if (!validateEmail(payload.email)) errors.email = FIELD_MESSAGES.email;
+  if (!validatePassword(payload.password)) errors.password = FIELD_MESSAGES.password;
+
+  return errors;
+}
+
 export function validateCredentialsPayload(payload = {}) {
   return (
     validateEmail(payload.email) &&

@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import pg from 'pg';
 import {
+  collectFieldErrors,
   generateJoinCode,
   generateRefreshToken,
   hashPassword,
@@ -12,9 +13,6 @@ import {
   requireAuth,
   requireLead,
   signAccessToken,
-  validateCredentialsPayload,
-  validateDisplayName,
-  validateJoinCode,
   verifyPassword,
 } from './auth.js';
 
@@ -132,8 +130,11 @@ app.get('/health', async (_request, response) => {
 app.post('/auth/teams', authLimiter, async (request, response) => {
   const { teamName, displayName, email, password } = request.body ?? {};
 
-  if (!validateDisplayName(teamName) || !validateCredentialsPayload(request.body ?? {})) {
-    return response.status(400).json({ error: "Nom d'equipe, nom, email et mot de passe valides requis" });
+  const fields = collectFieldErrors(request.body ?? {}, { withTeamName: true });
+  if (Object.keys(fields).length > 0) {
+    // Le premier message sert de resume ; l'objet complet permet au formulaire
+    // de signaler chaque champ fautif a sa place.
+    return response.status(400).json({ error: Object.values(fields)[0], fields });
   }
 
   const client = await pool.connect();
@@ -177,8 +178,9 @@ app.post('/auth/teams', authLimiter, async (request, response) => {
 app.post('/auth/join', joinLimiter, async (request, response) => {
   const { code, displayName, email, password } = request.body ?? {};
 
-  if (!validateJoinCode(code) || !validateCredentialsPayload(request.body ?? {})) {
-    return response.status(400).json({ error: 'Code a 6 chiffres, nom, email et mot de passe valides requis' });
+  const fields = collectFieldErrors(request.body ?? {}, { withCode: true });
+  if (Object.keys(fields).length > 0) {
+    return response.status(400).json({ error: Object.values(fields)[0], fields });
   }
 
   try {
