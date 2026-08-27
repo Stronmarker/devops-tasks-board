@@ -71,6 +71,8 @@ export default function App() {
     return <AuthScreen onAuthenticated={authenticate} />;
   }
 
+  const isLead = session.user.role === 'lead';
+
   return (
     <main className="shell">
       <header className="hero">
@@ -88,8 +90,15 @@ export default function App() {
       </header>
 
       <div className="layout">
-        <Board onUnauthorized={logout} />
-        {team && <TeamPanel team={team} onTeamChange={setTeam} />}
+        <Board isLead={isLead} onUnauthorized={logout} />
+        {team && (
+          <TeamPanel
+            team={team}
+            isLead={isLead}
+            currentUserId={session.user.id}
+            onTeamChange={setTeam}
+          />
+        )}
       </div>
     </main>
   );

@@ -95,3 +95,13 @@ h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
 .field-hint { color: #68766c; font: 400 0.76rem/1.4 sans-serif; }
 .field-error { color: #9f2e25; font: 700 0.76rem/1.4 sans-serif; }
 input.has-error { border-color: #9f2e25; border-width: 2px; }
+
+/* --- Actions du chef d'equipe ----------------------------------------- */
+.task-actions { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #ece5d6; }
+.task-actions button { min-height: 32px; padding: 0 10px; font: 700 0.74rem sans-serif; }
+.move { background: #f2f6f1; color: #355c50; border-color: #cbd8ce; font-size: 0.9rem; }
+.move:disabled { opacity: 0.35; cursor: not-allowed; }
+.danger { margin-left: auto; background: transparent; color: #9f2e25; border-color: #d9bcb8; }
+.danger.is-armed { background: #9f2e25; color: #fffaf0; border-color: #9f2e25; }
+.member-list .member-name { flex: 1; min-width: 0; }
+.member-list .danger { min-height: 30px; padding: 0 9px; margin-left: 0; font: 700 0.7rem sans-serif; }

@@ -12,6 +12,9 @@ const TASKS = [
   { id: 2, title: 'Deployer sur Render', status: 'doing', color: '#0EA5E9', project_name: null, created_by_name: null },
 ];
 
+const LEAD = { id: 1, displayName: 'Chef', role: 'lead' };
+const MEMBER = { id: 2, displayName: 'Membre', role: 'member' };
+
 const TEAM_LEAD = {
   name: 'DevOps Delivery Lab',
   joinCode: '482913',
@@ -162,7 +165,7 @@ describe('Session active', () => {
   it('valide le jeton aupres du serveur avant d ouvrir le tableau', async () => {
     const fetchMock = mockApi({
       ...REFRESH_OK,
-      '/auth/me': { body: { user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } } },
+      '/auth/me': { body: { user: LEAD, team: { name: 'Lab' } } },
       '/team': { body: TEAM_LEAD },
       '/tasks': { body: TASKS },
     });
@@ -185,7 +188,7 @@ describe('Session active', () => {
   it('repartit les taches par statut et compte chaque colonne', async () => {
     mockApi({
       ...REFRESH_OK,
-      '/auth/me': { body: { user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } } },
+      '/auth/me': { body: { user: LEAD, team: { name: 'Lab' } } },
       '/team': { body: TEAM_LEAD },
       '/tasks': { body: TASKS },
     });
@@ -200,7 +203,7 @@ describe('Session active', () => {
   it('montre le code d invitation au chef d equipe', async () => {
     mockApi({
       ...REFRESH_OK,
-      '/auth/me': { body: { user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } } },
+      '/auth/me': { body: { user: LEAD, team: { name: 'Lab' } } },
       '/team': { body: TEAM_LEAD },
       '/tasks': { body: [] },
     });
@@ -213,7 +216,7 @@ describe('Session active', () => {
   it('cache le code d invitation a un simple membre', async () => {
     mockApi({
       ...REFRESH_OK,
-      '/auth/me': { body: { user: { displayName: 'Membre', role: 'member' }, team: { name: 'Lab' } } },
+      '/auth/me': { body: { user: MEMBER, team: { name: 'Lab' } } },
       '/team': { body: { ...TEAM_LEAD, joinCode: null } },
       '/tasks': { body: [] },
     });
@@ -235,8 +238,7 @@ describe('Session active', () => {
 
         if (path === '/auth/refresh')
           return ok({ accessToken: 'acces-frais', refreshToken: 'refresh-suivant' });
-        if (path === '/auth/me')
-          return ok({ user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } });
+        if (path === '/auth/me') return ok({ user: LEAD, team: { name: 'Lab' } });
         if (path === '/team') return ok(TEAM_LEAD);
         if (path === '/tasks' && options.method !== 'POST') {
           // Premiere lecture : le jeton d'acces vient d'expirer. La seconde,
@@ -268,10 +270,104 @@ describe('Session active', () => {
     expect(localStorage.getItem('tasks-board-refresh')).toBeNull();
   });
 
+  it('le chef peut avancer une tache, et pas la reculer depuis la premiere colonne', async () => {
+    const fetchMock = mockApi({
+      ...REFRESH_OK,
+      '/auth/me': { body: { user: LEAD, team: { name: 'Lab' } } },
+      '/team': { body: TEAM_LEAD },
+      '/tasks': { body: TASKS },
+      'PATCH /tasks/1': { body: { id: 1, status: 'doing' } },
+    });
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText('Ecrire le pipeline')).toBeDefined());
+
+    // La tache est dans "A faire" : reculer n'a pas de sens.
+    expect(screen.getByLabelText('Reculer : Ecrire le pipeline').disabled).toBe(true);
+
+    fireEvent.click(screen.getByLabelText('Avancer : Ecrire le pipeline'));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([, options]) => options?.method === 'PATCH');
+      expect(JSON.parse(call[1].body)).toEqual({ status: 'doing' });
+    });
+  });
+
+  it('la suppression d une tache demande une confirmation', async () => {
+    const fetchMock = mockApi({
+      ...REFRESH_OK,
+      '/auth/me': { body: { user: LEAD, team: { name: 'Lab' } } },
+      '/team': { body: TEAM_LEAD },
+      '/tasks': { body: TASKS },
+      'DELETE /tasks/1': { status: 204 },
+    });
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText('Ecrire le pipeline')).toBeDefined());
+
+    const bouton = screen.getByTitle('Supprimer : Ecrire le pipeline');
+    fireEvent.click(bouton);
+
+    // Premier clic : rien n'est envoye, le bouton demande confirmation.
+    expect(fetchMock.mock.calls.some(([, o]) => o?.method === 'DELETE')).toBe(false);
+    expect(bouton.textContent).toBe('Confirmer ?');
+
+    fireEvent.click(bouton);
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([, o]) => o?.method === 'DELETE')).toBe(true),
+    );
+  });
+
+  it('un membre ne voit aucun bouton de deplacement ni de suppression', async () => {
+    mockApi({
+      ...REFRESH_OK,
+      '/auth/me': { body: { user: MEMBER, team: { name: 'Lab' } } },
+      '/team': { body: { ...TEAM_LEAD, joinCode: null } },
+      '/tasks': { body: TASKS },
+    });
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText('Ecrire le pipeline')).toBeDefined());
+
+    expect(screen.queryByLabelText('Avancer : Ecrire le pipeline')).toBeNull();
+    expect(screen.queryByTitle('Supprimer : Ecrire le pipeline')).toBeNull();
+    expect(screen.queryByTitle(/Retirer .* de l'equipe/)).toBeNull();
+  });
+
+  it('le chef retire un membre mais pas lui-meme', async () => {
+    const fetchMock = mockApi({
+      ...REFRESH_OK,
+      '/auth/me': { body: { user: LEAD, team: { name: 'Lab' } } },
+      '/team': { body: TEAM_LEAD },
+      '/tasks': { body: [] },
+      'DELETE /team/members/2': { status: 204 },
+    });
+    render(<App />);
+
+    // "Membre" est a la fois le nom et le libelle du badge : on attend le
+    // bouton, qui lui est sans ambiguite.
+    await waitFor(() => expect(screen.getByTitle("Retirer Membre de l'equipe")).toBeDefined());
+
+    // Aucun bouton en face de son propre nom.
+    expect(screen.queryByTitle("Retirer Chef de l'equipe")).toBeNull();
+
+    const bouton = screen.getByTitle("Retirer Membre de l'equipe");
+    fireEvent.click(bouton);
+    fireEvent.click(bouton);
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, o]) => o?.method === 'DELETE' && String(url).endsWith('/team/members/2'),
+        ),
+      ).toBe(true),
+    );
+  });
+
   it('envoie la couleur choisie lors de la creation d une tache', async () => {
     const fetchMock = mockApi({
       ...REFRESH_OK,
-      '/auth/me': { body: { user: { displayName: 'Chef', role: 'lead' }, team: { name: 'Lab' } } },
+      '/auth/me': { body: { user: LEAD, team: { name: 'Lab' } } },
       '/team': { body: TEAM_LEAD },
       '/tasks': { body: [] },
       'POST /tasks': { status: 201, body: { id: 9 } },
