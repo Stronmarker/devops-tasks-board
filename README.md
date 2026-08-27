@@ -44,7 +44,31 @@ Sans compte, aucune route métier ne répond autre chose que `401`.
 | `GET /auth/me` | Jeton d'accès | Valide le jeton et renvoie l'identité |
 | `GET /team` | Jeton d'accès | Membres de l'équipe ; le code n'est renvoyé qu'au chef |
 | `POST /team/code` | Jeton d'accès + rôle chef | Remplace le code d'invitation |
+| `DELETE /team/members/:id` | Jeton d'accès + rôle chef | Retire un membre de l'équipe |
 | `GET`/`POST /tasks`, `GET /projects` | Jeton d'accès | Cloisonnés sur l'équipe du jeton |
+| `PATCH /tasks/:id` | Jeton d'accès + rôle chef | Déplace la tâche d'une colonne à l'autre |
+| `DELETE /tasks/:id` | Jeton d'accès + rôle chef | Supprime la tâche |
+
+### Répartition des droits
+
+| Action | Membre | Chef |
+| --- | :---: | :---: |
+| Voir le tableau et les projets | ✅ | ✅ |
+| Créer une tâche | ✅ | ✅ |
+| Déplacer une tâche entre colonnes | ❌ | ✅ |
+| Supprimer une tâche | ❌ | ✅ |
+| Voir le code d'invitation | ❌ | ✅ |
+| Renouveler le code | ❌ | ✅ |
+| Retirer un membre | ❌ | ✅ |
+
+L'interface masque les boutons qu'un membre n'a pas le droit d'utiliser, mais **c'est le
+serveur qui décide** : `requireLead` protège chaque route réservée. Masquer un bouton est du
+confort, pas une protection — un appel direct à l'API reçoit `403`.
+
+Deux garde-fous complètent le rôle : un chef ne peut pas se retirer lui-même, ce qui
+laisserait l'équipe sans personne pour gérer le code et les membres ; et retirer un membre
+supprime ses jetons de rafraîchissement en cascade, donc il perd l'accès au plus tard quinze
+minutes après. Ses tâches restent au tableau : elles appartiennent à l'équipe, pas à lui.
 
 ### Deux jetons, deux rôles
 
