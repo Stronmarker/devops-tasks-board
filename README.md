@@ -158,6 +158,14 @@ Le plan gratuit Render supprime la base managée au bout de 30 jours. La procéd
 DATABASE_URL="<External Database URL>" make db-bootstrap
 ```
 
+Pour ne pas la retaper à chaque fois, copiez [.env.example](.env.example) en `.env` à la racine :
+`make` le lit automatiquement, et `.gitignore` empêche qu'il soit versionné. Écrivez la valeur
+**sans guillemets** — `make` les traiterait comme des caractères de l'URL.
+
+Une fois `DATABASE_URL` dans ce fichier, `make db-bootstrap` vise la base distante sans autre
+geste. La protection ne repose alors plus que sur `--reset --force`, obligatoire pour toute
+suppression.
+
 4. Vérifier : `curl https://<backend>.onrender.com/health` doit renvoyer `"database":"connected"`
 
 Le script est [scripts/bootstrap_db.sh](scripts/bootstrap_db.sh). Comme `init_db.sql` est

@@ -1,3 +1,15 @@
+# Charge un .env a la racine s'il existe, pour ne pas retaper l'URL de la base
+# distante a chaque appel. Ce fichier n'est jamais versionne (voir .gitignore).
+#
+# Consequence a connaitre : une fois DATABASE_URL presente ici, db-bootstrap
+# vise la base distante sans autre geste. La protection ne repose donc plus que
+# sur --reset --force, qui reste obligatoire pour toute suppression.
+#
+# Ecrire les valeurs SANS guillemets : make les traiterait comme des caracteres
+# du mot de passe.
+-include .env
+export DATABASE_URL
+
 COMPOSE_FILE := infra/docker/docker-compose.yml
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 
