@@ -1,81 +1,85 @@
-import { useEffect, useState } from 'react';
-
-const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { useCallback, useEffect, useState } from 'react';
+import AuthScreen from './AuthScreen.jsx';
+import Board from './Board.jsx';
+import TeamPanel from './TeamPanel.jsx';
+import { apiFetch, clearToken, getToken, setToken } from './api.js';
 
 export default function App() {
-  const [tasks, setTasks] = useState([]);
-  const [title, setTitle] = useState('');
-  const [status, setStatus] = useState('todo');
-  const [error, setError] = useState('');
+  const [session, setSession] = useState(null);
+  const [team, setTeam] = useState(null);
+  // checking couvre l'instant ou un jeton existe mais n'a pas encore ete
+  // valide : afficher l'ecran de connexion pendant ce temps ferait clignoter
+  // l'interface a chaque rechargement.
+  const [checking, setChecking] = useState(Boolean(getToken()));
 
-  const loadTasks = async () => {
+  const loadTeam = async () => {
     try {
-      const response = await fetch(`${apiUrl}/tasks`);
-      if (!response.ok) throw new Error('Chargement impossible');
-      setTasks(await response.json());
-      setError('');
-    } catch (loadError) {
-      setError(loadError.message);
+      setTeam(await apiFetch('/team'));
+    } catch {
+      setTeam(null);
     }
+  };
+
+  // Identite stable : Board recoit cette fonction en dependance de son effet
+  // de chargement, une nouvelle reference a chaque rendu le relancerait en boucle.
+  const logout = useCallback(() => {
+    clearToken();
+    setSession(null);
+    setTeam(null);
+  }, []);
+
+  const authenticate = async ({ token, user }) => {
+    setToken(token);
+    setSession({ user });
+    await loadTeam();
   };
 
   useEffect(() => {
-    loadTasks();
+    if (!getToken()) return;
+
+    // Un jeton present ne prouve rien : il peut avoir expire ou avoir ete
+    // revoque cote base. On demande au serveur avant d'ouvrir le tableau.
+    apiFetch('/auth/me')
+      .then(async ({ user }) => {
+        setSession({ user });
+        await loadTeam();
+      })
+      .catch(clearToken)
+      .finally(() => setChecking(false));
   }, []);
 
-  const addTask = async (event) => {
-    event.preventDefault();
-    if (!title.trim()) return;
-    const response = await fetch(`${apiUrl}/tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, status }),
-    });
-    if (response.ok) {
-      setTitle('');
-      await loadTasks();
-    } else {
-      setError('Création impossible');
-    }
-  };
+  if (checking) {
+    return (
+      <main className="shell">
+        <p className="loading">Verification de la session...</p>
+      </main>
+    );
+  }
+
+  if (!session) {
+    return <AuthScreen onAuthenticated={authenticate} />;
+  }
 
   return (
     <main className="shell">
       <header className="hero">
-        <p className="eyebrow">DEVOPS DELIVERY LAB</p>
-        <h1>Tasks Board</h1>
-        <p className="intro">Un espace simple pour piloter les tâches techniques du projet.</p>
+        <div>
+          <p className="eyebrow">DEVOPS DELIVERY LAB</p>
+          <h1>Tasks Board</h1>
+          <p className="intro">
+            {session.user.displayName}
+            {session.user.role === 'lead' ? " - chef d'equipe" : ' - membre'}
+          </p>
+        </div>
+        <button type="button" className="ghost" onClick={logout}>
+          Se deconnecter
+        </button>
       </header>
 
-      <section className="workspace">
-        <form className="task-form" onSubmit={addTask}>
-          <label htmlFor="title">Nouvelle tâche</label>
-          <div className="form-row">
-            <input id="title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex. Ajouter un scan SAST" />
-            <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Statut">
-              <option value="todo">À faire</option>
-              <option value="doing">En cours</option>
-              <option value="done">Terminée</option>
-            </select>
-            <button type="submit">Ajouter</button>
-          </div>
-        </form>
-
-        {error && <p className="error">{error}</p>}
-        <div className="board">
-          {['todo', 'doing', 'done'].map((columnStatus) => (
-            <section className="column" key={columnStatus}>
-              <h2>{columnStatus === 'todo' ? 'À faire' : columnStatus === 'doing' ? 'En cours' : 'Terminées'}</h2>
-              {tasks.filter((task) => task.status === columnStatus).map((task) => (
-                <article className="task" key={task.id}>
-                  <h3>{task.title}</h3>
-                  {task.project_name && <p>{task.project_name}</p>}
-                </article>
-              ))}
-            </section>
-          ))}
-        </div>
-      </section>
+      <div className="layout">
+        <Board onUnauthorized={logout} />
+        {team && <TeamPanel team={team} onTeamChange={setTeam} />}
+      </div>
     </main>
   );
 }

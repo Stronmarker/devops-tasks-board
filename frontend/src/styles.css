@@ -7,23 +7,85 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
+
+/* --- Structure ------------------------------------------------------- */
 .shell { min-height: 100vh; padding: 48px clamp(20px, 6vw, 96px); background: radial-gradient(circle at 90% 0%, #f7d7a9 0 18%, transparent 42%), linear-gradient(135deg, #e8eee8, #c8d8d0); }
-.hero { max-width: 900px; margin: 0 auto 42px; }
+.hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; max-width: 1400px; margin: 0 auto 42px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; max-width: 1400px; margin: 0 auto; align-items: start; }
+.workspace { min-width: 0; }
 .eyebrow { margin: 0 0 12px; color: #bc5a3c; font: 700 0.78rem/1 sans-serif; letter-spacing: 0.12em; }
-h1 { margin: 0; font-size: clamp(3.2rem, 9vw, 7rem); line-height: 0.9; font-weight: 500; }
+h1 { margin: 0; font-size: clamp(2.6rem, 7vw, 5.4rem); line-height: 0.9; font-weight: 500; }
 .intro { max-width: 520px; margin: 22px 0 0; font-size: 1.2rem; }
-.workspace { max-width: 1100px; margin: 0 auto; }
-.task-form { padding: 22px; background: #fffaf0; border: 1px solid #d2c9b5; box-shadow: 8px 8px 0 #b7c8bd; }
-.task-form label { display: block; margin-bottom: 10px; font-weight: 700; }
-.form-row { display: flex; gap: 10px; }
+
+/* --- Formulaires et boutons ------------------------------------------ */
 input, select, button { min-height: 44px; border: 1px solid #b7b5a9; padding: 0 13px; font: inherit; }
 input { flex: 1; min-width: 0; }
 button { background: #bc5a3c; color: white; border-color: #bc5a3c; cursor: pointer; font-weight: 700; }
+button:disabled { opacity: 0.6; cursor: progress; }
+.ghost { background: transparent; color: #355c50; border-color: #355c50; }
+/* Anneau de focus visible : la navigation au clavier doit rester lisible. */
+:focus-visible { outline: 3px solid #bc5a3c; outline-offset: 2px; }
+
+.task-form { padding: 22px; background: #fffaf0; border: 1px solid #d2c9b5; box-shadow: 8px 8px 0 #b7c8bd; }
+.task-form > label { display: block; margin-bottom: 10px; font-weight: 700; }
+.form-row { display: flex; gap: 10px; }
+
+.color-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; padding: 14px 12px 12px; border: 1px dashed #d2c9b5; }
+.color-picker legend { padding: 0 6px; font: 700 0.82rem sans-serif; }
+.color-option { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px 6px 8px; border: 1px solid #d2c9b5; background: #fff; cursor: pointer; font: 0.82rem sans-serif; }
+.color-option:has(input:checked) { border-color: #19231f; box-shadow: 2px 2px 0 #b7c8bd; }
+.color-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.color-dot { width: 15px; height: 15px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.25); }
+
+/* --- Tableau --------------------------------------------------------- */
 .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 34px; }
 .column { min-height: 240px; padding: 18px; background: rgba(255, 250, 240, 0.66); border-top: 4px solid #355c50; }
-h2 { margin: 0 0 18px; font-size: 1.35rem; }
-.task { margin-top: 12px; padding: 15px; background: #fffaf0; border-left: 4px solid #e2a54e; }
+h2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 18px; font-size: 1.35rem; }
+.count { min-width: 26px; padding: 2px 8px; background: #355c50; color: #fffaf0; font: 700 0.78rem/1.6 sans-serif; text-align: center; }
+.task { margin-top: 12px; padding: 15px; background: #fffaf0; border-left: 5px solid #e2a54e; }
 h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
 .task p { margin: 8px 0 0; color: #68766c; font: 0.82rem sans-serif; }
+.task-author { font-style: italic; }
+.empty, .loading { color: #68766c; font: 0.88rem sans-serif; font-style: italic; }
 .error { color: #9f2e25; font-family: sans-serif; }
-@media (max-width: 700px) { .form-row, .board { grid-template-columns: 1fr; display: grid; } }
+
+/* --- Panneau equipe -------------------------------------------------- */
+.team-panel { padding: 22px; background: #fffaf0; border: 1px solid #d2c9b5; box-shadow: 8px 8px 0 #b7c8bd; }
+.team-panel h2 { display: block; margin-bottom: 16px; font-size: 1.5rem; }
+.team-panel h3 { margin: 26px 0 10px; font: 700 0.82rem sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #68766c; }
+.join-code { padding: 16px; background: #f2f6f1; border: 1px dashed #355c50; }
+.join-code-label { margin: 0; font: 700 0.75rem sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: #355c50; }
+.join-code-value { margin: 8px 0 12px; font: 700 2.4rem/1 'Courier New', monospace; letter-spacing: 0.18em; }
+.join-code-help { margin: 0 0 14px; color: #68766c; font: 0.78rem/1.5 sans-serif; }
+.join-code button { width: 100%; }
+.member-list { margin: 0; padding: 0; list-style: none; }
+.member-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #e4ded0; font: 0.92rem sans-serif; }
+.member-list li:last-child { border-bottom: none; }
+.badge { padding: 3px 9px; background: #e4ded0; color: #4a5a4f; font: 700 0.7rem sans-serif; letter-spacing: 0.04em; }
+.badge-lead { background: #355c50; color: #fffaf0; }
+
+/* --- Ecran de connexion ---------------------------------------------- */
+.auth-shell { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 20px; background: radial-gradient(circle at 90% 0%, #f7d7a9 0 18%, transparent 42%), linear-gradient(135deg, #e8eee8, #c8d8d0); }
+.auth-card { width: 100%; max-width: 480px; padding: 34px; background: #fffaf0; border: 1px solid #d2c9b5; box-shadow: 10px 10px 0 #b7c8bd; }
+.auth-header h1 { font-size: clamp(2.4rem, 8vw, 3.4rem); }
+.auth-header .intro { margin-top: 14px; font-size: 1rem; }
+.auth-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 28px 0 22px; }
+.auth-tab { flex: 1 1 auto; min-height: 40px; padding: 0 12px; background: transparent; color: #4a5a4f; border-color: #d2c9b5; font: 700 0.82rem sans-serif; }
+.auth-tab.is-active { background: #355c50; color: #fffaf0; border-color: #355c50; }
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+.auth-hint { margin: 0; color: #68766c; font: 0.86rem/1.5 sans-serif; }
+.auth-field { display: flex; flex-direction: column; gap: 6px; font: 700 0.82rem sans-serif; }
+.auth-field input { width: 100%; }
+.primary { background: #bc5a3c; }
+
+/* --- Responsive ------------------------------------------------------ */
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: 1fr; }
+  .team-panel { order: -1; }
+}
+@media (max-width: 700px) {
+  .shell { padding: 32px 18px; }
+  .hero { flex-direction: column; }
+  .form-row { display: grid; grid-template-columns: 1fr; }
+  .board { display: grid; grid-template-columns: 1fr; }
+}
