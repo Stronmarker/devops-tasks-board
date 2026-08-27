@@ -543,7 +543,7 @@
         <b>Une limite que j'assume.</b> Render reconstruit son propre artefact et n'utilise ni mes
         Dockerfiles ni mes manifests. L'image que le pipeline teste n'est donc pas exactement celle
         qui tourne en production. Une chaîne mature publierait l'image sur un registre et déploierait
-        <em>celle-là</em> partout — <span class="mono">build once, deploy anywhere</span>.
+        <em>celle-là</em> partout, selon le principe <span class="mono">build once, deploy anywhere</span>.
       </div>
     </div>
   </section>
@@ -576,7 +576,7 @@
         </div>
         <div class="stage">
           <div class="who">Images</div>
-          <div class="what">Construction des deux images Docker — garantit que le déploiement Kubernetes reste possible</div>
+          <div class="what">Construction des deux images Docker : garantit que le déploiement Kubernetes reste possible</div>
           <div><span class="pill pill-flat">2 images</span></div>
         </div>
         <div class="stage">
@@ -605,8 +605,8 @@
       <p class="eyebrow"><span class="num">05</span> &nbsp;Authentification</p>
       <h2>Une équipe, un code, deux jetons</h2>
       <p class="lede">
-        Une équipe est un espace fermé. On y entre en la créant — on en devient chef —
-        ou avec le code à 6 chiffres remis par le chef.
+        Une équipe est un espace fermé. On y entre de deux façons : en la créant, et on en devient
+        alors chef, ou avec le code à 6 chiffres remis par le chef.
       </p>
 
       <div class="grid g2">
@@ -655,7 +655,7 @@
             </tr>
             <tr>
               <td>Vol de mot de passe en cas de fuite de la base</td>
-              <td>bcrypt à 12 tours, salage automatique — deux comptes au même mot de passe n'ont pas le même hash</td>
+              <td>bcrypt à 12 tours, salage automatique : deux comptes au même mot de passe n'ont pas le même hash</td>
               <td><span class="pill pill-ok">traité</span></td>
             </tr>
             <tr>
@@ -665,7 +665,7 @@
             </tr>
             <tr>
               <td>Accès aux données d'une autre équipe</td>
-              <td>Le filtre vient du jeton signé, jamais d'un paramètre — donc rien à falsifier côté client</td>
+              <td>Le filtre vient du jeton signé, jamais d'un paramètre donc rien à falsifier côté client</td>
               <td><span class="pill pill-ok">traité</span></td>
             </tr>
             <tr>
@@ -695,7 +695,7 @@
       <p class="eyebrow"><span class="num">07</span> &nbsp;Orchestration</p>
       <h2>L'infrastructure a dicté l'architecture</h2>
       <p class="lede">
-        Le backend tourne en deux exemplaires. Deux pods ne partagent pas leur mémoire — une session
+        Le backend tourne en deux exemplaires. Deux pods ne partagent pas leur mémoire ainsi une session
         stockée côté serveur serait invisible de l'un à l'autre. <strong>C'est cette contrainte qui
         impose une authentification sans état.</strong>
       </p>
@@ -775,7 +775,7 @@ même jeton dans le pod B
 
       <div class="note">
         <b>Le script de restauration n'est pas théorique.</b> C'est lui qui a migré la base de
-        production lors de l'ajout de l'authentification, sans interruption ni perte de données —
+        production lors de l'ajout de l'authentification, sans interruption ni perte de données
         parce que le fichier SQL est écrit pour s'appliquer aussi bien à une base vierge qu'à une
         base déjà peuplée.
       </div>
@@ -796,7 +796,7 @@ même jeton dans le pod B
             HTML, CSS, JavaScript : tout arrivait correctement. Mais le bundle plantait au démarrage,
             faute d'un plugin jamais branché dans la configuration de build.
           </p>
-          <p style="font-size:.93rem"><b>Leçon</b> — un <span class="mono">200</span> sur une application
+          <p style="font-size:.93rem"><b>Leçon</b> : un <span class="mono">200</span> sur une application
           monopage ne prouve rien. <span class="mono">curl</span> n'exécute jamais le JavaScript.</p>
         </div>
         <div class="card">
@@ -806,7 +806,7 @@ même jeton dans le pod B
             Le service redémarrait sans fin en production. Les variables avaient été mises dans un
             groupe non rattaché au service.
           </p>
-          <p style="font-size:.93rem"><b>Leçon</b> — une sonde qui teste vraiment la base transforme
+          <p style="font-size:.93rem"><b>Leçon</b> : une sonde qui teste vraiment la base transforme
           une panne opaque en diagnostic de 30 secondes.</p>
         </div>
         <div class="card">
@@ -816,7 +816,7 @@ même jeton dans le pod B
             Impossible de créer une équipe. Quatre erreurs distinctes renvoyaient le même texte,
             et la règle du mot de passe n'était écrite nulle part.
           </p>
-          <p style="font-size:.93rem"><b>Leçon</b> — le backend était correct, les tests passaient,
+          <p style="font-size:.93rem"><b>Leçon</b> : le backend était correct, les tests passaient,
           la sécurité était bonne. L'application était quand même inutilisable.</p>
         </div>
       </div>
@@ -837,22 +837,22 @@ même jeton dans le pod B
       <div class="chain" style="margin-bottom:8px">
         <div class="stage">
           <div class="who">Local</div>
-          <div class="what"><span class="mono">make start</span> — les trois tiers, données de démonstration affichées</div>
+          <div class="what"><span class="mono">make start</span>, les trois tiers, données de démonstration affichées</div>
           <div><span class="pill pill-flat">2 s</span></div>
         </div>
         <div class="stage">
           <div class="who">Rôles</div>
-          <div class="what">Connexion chef puis membre — le code d'invitation disparaît, les boutons aussi</div>
+          <div class="what">Connexion chef puis membre : le code d'invitation disparaît, les boutons aussi</div>
           <div><span class="pill pill-accent">403</span></div>
         </div>
         <div class="stage">
           <div class="who">API</div>
-          <div class="what"><span class="mono">curl</span> direct sur une route réservée — <b>contourner l'interface ne contourne pas la règle</b></div>
+          <div class="what"><span class="mono">curl</span> direct sur une route réservée. <b>Contourner l'interface ne contourne pas la règle</b></div>
           <div><span class="pill pill-fail">403</span></div>
         </div>
         <div class="stage">
           <div class="who">Cluster</div>
-          <div class="what"><span class="mono">kubectl delete pod</span> — l'API continue de répondre pendant le remplacement</div>
+          <div class="what"><span class="mono">kubectl delete pod</span>, l'API continue de répondre pendant le remplacement</div>
           <div><span class="pill pill-ok">200</span></div>
         </div>
         <div class="stage">
