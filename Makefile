@@ -13,7 +13,7 @@ export DATABASE_URL
 COMPOSE_FILE := infra/docker/docker-compose.yml
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 
-.PHONY: help build start stop restart logs test test-frontend lint ci db-reset db-bootstrap reset clean
+.PHONY: help build start stop restart logs test test-frontend lint ci db-reset db-bootstrap db-suppr reset clean
 
 help:
 	@echo "Cibles disponibles :"
@@ -28,6 +28,7 @@ help:
 	@echo "  make ci            Rejouer localement les verifications du pipeline"
 	@echo "  make db-reset      Vider la base locale et rejouer les donnees de demo"
 	@echo "  make db-bootstrap  Restaurer une base distante : DATABASE_URL=... make db-bootstrap"
+	@echo "  make db-suppr      SUPPRIMER completement la base (confirmation au clavier)"
 	@echo "  make reset         Repartir d'une base vierge (reconstruit aussi les images)"
 	@echo "  make clean         Tout supprimer (conteneurs, volumes, images)"
 
@@ -80,6 +81,12 @@ db-bootstrap:
 		echo "  DATABASE_URL=\"postgres://...\" make db-bootstrap"; \
 		exit 1; }
 	@./scripts/bootstrap_db.sh $(ARGS) "$(DATABASE_URL)"
+
+# Supprime les tables elles-memes, pas seulement leur contenu. Irreversible.
+# Le script demande de taper "supprimer" et refuse de s'executer sans clavier :
+# aucune CI ne peut donc la declencher.
+db-suppr:
+	@./scripts/drop_db.sh
 
 reset:
 	$(COMPOSE) down -v

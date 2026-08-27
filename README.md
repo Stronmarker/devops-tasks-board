@@ -139,6 +139,7 @@ disparaît à la fermeture de l'onglet. Ce compromis est documenté dans `docs/d
 | `make ci` | Rejoue localement l'enchaînement du pipeline |
 | `make db-reset` | Vide la base **locale** et rejoue les données de démo |
 | `make db-bootstrap` | Restaure une base **distante** : `DATABASE_URL="postgres://..." make db-bootstrap` |
+| `make db-suppr` | **Supprime** complètement la base ciblée, confirmation au clavier |
 | `make reset` | Repart d'une base vierge et reconstruit les images |
 | `make clean` | Supprime services, volumes et images locales |
 
@@ -182,6 +183,29 @@ DATABASE_URL="<url>" make db-bootstrap ARGS="--reset --force"
 
 Le script n'affiche jamais que le nom d'hôte, jamais les identifiants : l'URL complète ne se
 retrouve donc ni dans un terminal partagé, ni dans un journal de CI.
+
+### Suppression complète
+
+```bash
+make db-suppr
+```
+
+Supprime les tables elles-mêmes, pas seulement leur contenu. Après coup la base est vide et
+l'application ne peut plus démarrer tant que `make db-bootstrap` n'a pas été rejoué.
+
+Trois protections, parce que la cible peut être la production :
+
+- le mot **`supprimer`** doit être tapé en toutes lettres, rien d'autre n'est accepté
+- l'hôte visé est affiché avant la question, avec la liste de ce qui va disparaître
+- la commande refuse de s'exécuter sans clavier : aucun pipeline ne peut la déclencher
+
+### Les trois niveaux, à ne pas confondre
+
+| Commande | Portée | Effet | Après |
+| --- | --- | --- | --- |
+| `make db-reset` | Locale | Vide les tables, recharge la démo | Prêt à l'emploi |
+| `make db-bootstrap ARGS="--reset --force"` | **Ciblée par `DATABASE_URL`** | Vide les tables, recharge la démo | Prêt à l'emploi |
+| `make db-suppr` | **Ciblée par `DATABASE_URL`** | Supprime les tables | `db-bootstrap` obligatoire |
 
 ## Tests
 

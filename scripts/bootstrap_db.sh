@@ -17,8 +17,8 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SQL_DIR="$ROOT_DIR/infra/db"
+# shellcheck source=scripts/_db_lib.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_db_lib.sh"
 
 RESET=0
 FORCE=0
@@ -59,37 +59,9 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-if [ -z "$URL" ]; then
-    echo "Erreur : aucune URL de base fournie." >&2
-    echo "  ./scripts/bootstrap_db.sh \"postgres://...\"  ou  DATABASE_URL=... $0" >&2
-    exit 1
-fi
+require_url "$URL"
+HOST="$(db_host "$URL")"
 
-# Hote seul, sans identifiants : le script affiche sur quelle base il agit sans
-# jamais ecrire un mot de passe dans un terminal ou un journal de CI.
-HOST="$(printf '%s' "$URL" | sed -E 's#^[a-zA-Z+]+://[^@]*@##; s#[:/?].*$##')"
-
-# Les NOTICE d'idempotence ("relation deja existante") noieraient une vraie
-# erreur dans le bruit. On remonte le seuil a warning : les erreurs restent
-# visibles, et ON_ERROR_STOP interrompt le script des la premiere.
-export PGOPTIONS='-c client_min_messages=warning'
-
-run_sql() {
-    local file="$1"
-
-    if command -v psql >/dev/null 2>&1; then
-        # ON_ERROR_STOP : sans lui, psql poursuit apres une erreur et renvoie 0,
-        # ce qui ferait passer une restauration ratee pour un succes.
-        psql "$URL" -v ON_ERROR_STOP=1 -q -f "$SQL_DIR/$file"
-    else
-        # Repli sans psql installe : le client officiel dans un conteneur.
-        # localhost designerait le conteneur lui-meme, d'ou la reecriture.
-        local url_docker="${URL//localhost/host.docker.internal}"
-        url_docker="${url_docker//127.0.0.1/host.docker.internal}"
-        docker run --rm -i -e PGOPTIONS -v "$SQL_DIR:/sql:ro" postgres:15-alpine \
-            psql "$url_docker" -v ON_ERROR_STOP=1 -q -f "/sql/$file"
-    fi
-}
 
 if [ "$RESET" -eq 1 ] && [ "$FORCE" -ne 1 ]; then
     echo "Refus : --reset supprime TOUTES les donnees de $HOST." >&2
@@ -99,9 +71,9 @@ fi
 
 if [ "$RESET" -eq 1 ]; then
     echo "Suppression des donnees de $HOST..."
-    run_sql reset_db.sql
+    run_sql "$URL" reset_db.sql
 fi
 
 echo "Application du schema sur $HOST..."
-run_sql init_db.sql
+run_sql "$URL" init_db.sql
 echo "Termine. Verifiez avec : curl <url-backend>/health"
