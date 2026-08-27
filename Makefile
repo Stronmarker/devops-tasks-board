@@ -1,7 +1,7 @@
 COMPOSE_FILE := infra/docker/docker-compose.yml
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 
-.PHONY: help build start stop restart logs test test-frontend lint ci db-reset reset clean
+.PHONY: help build start stop restart logs test test-frontend lint ci db-reset db-bootstrap reset clean
 
 help:
 	@echo "Cibles disponibles :"
@@ -15,6 +15,7 @@ help:
 	@echo "  make test-frontend Tests frontend (composants dans jsdom)"
 	@echo "  make ci            Rejouer localement les verifications du pipeline"
 	@echo "  make db-reset      Vider la base locale et rejouer les donnees de demo"
+	@echo "  make db-bootstrap  Restaurer une base distante : DATABASE_URL=... make db-bootstrap"
 	@echo "  make reset         Repartir d'une base vierge (reconstruit aussi les images)"
 	@echo "  make clean         Tout supprimer (conteneurs, volumes, images)"
 
@@ -55,6 +56,18 @@ db-reset:
 		"TRUNCATE TABLE refresh_tokens, tasks, projects, users, teams RESTART IDENTITY CASCADE;"
 	$(COMPOSE) exec -T db psql -U devops -d tasksdb -f /docker-entrypoint-initdb.d/01-init.sql
 	@echo "Base locale reinitialisee avec les donnees de demo."
+
+# Seule cible capable de viser une base DISTANTE (Render). Volontairement sans
+# valeur par defaut : l'URL doit etre fournie explicitement a chaque appel, pour
+# qu'une base de production ne puisse pas etre atteinte par megarde.
+#   DATABASE_URL="postgres://..." make db-bootstrap
+#   DATABASE_URL="postgres://..." make db-bootstrap ARGS="--reset --force"
+db-bootstrap:
+	@test -n "$(DATABASE_URL)" || { \
+		echo "DATABASE_URL est obligatoire."; \
+		echo "  DATABASE_URL=\"postgres://...\" make db-bootstrap"; \
+		exit 1; }
+	@./scripts/bootstrap_db.sh $(ARGS) "$(DATABASE_URL)"
 
 reset:
 	$(COMPOSE) down -v

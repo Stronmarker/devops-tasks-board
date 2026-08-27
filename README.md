@@ -138,12 +138,42 @@ disparaît à la fermeture de l'onglet. Ce compromis est documenté dans `docs/d
 | `make test-frontend` | Tests frontend (composants montés dans jsdom) |
 | `make ci` | Rejoue localement l'enchaînement du pipeline |
 | `make db-reset` | Vide la base **locale** et rejoue les données de démo |
+| `make db-bootstrap` | Restaure une base **distante** : `DATABASE_URL="postgres://..." make db-bootstrap` |
 | `make reset` | Repart d'une base vierge et reconstruit les images |
 | `make clean` | Supprime services, volumes et images locales |
 
-Les cibles `make` passent toutes par Docker Compose : elles n'agissent que sur les conteneurs
-de la machine locale. Aucune ne peut atteindre la base Render, qui n'est joignable que par son
-URL externe.
+Toutes les cibles passent par Docker Compose et n'agissent donc que sur les conteneurs locaux —
+sauf `db-bootstrap`, seule capable de viser une base distante. Elle n'a volontairement aucune
+valeur par défaut : sans `DATABASE_URL` explicite, elle refuse de démarrer.
+
+## Restauration de la base
+
+Le plan gratuit Render supprime la base managée au bout de 30 jours. La procédure de reprise :
+
+1. Créer une nouvelle base PostgreSQL sur Render
+2. Copier son *Internal Database URL* dans la variable `DATABASE_URL` du service backend
+3. Restaurer le schéma et les données de démo :
+
+```bash
+DATABASE_URL="<External Database URL>" make db-bootstrap
+```
+
+4. Vérifier : `curl https://<backend>.onrender.com/health` doit renvoyer `"database":"connected"`
+
+Le script est [scripts/bootstrap_db.sh](scripts/bootstrap_db.sh). Comme `init_db.sql` est
+idempotent, il peut être rejoué sur une base déjà peuplée : il crée ce qui manque et laisse le
+reste intact. C'est aussi lui qui a servi à migrer la base de production lors de l'ajout de
+l'authentification.
+
+Pour repartir de zéro, `--reset` vide les tables avant de recréer — protégé par `--force`, sans
+lequel le script refuse :
+
+```bash
+DATABASE_URL="<url>" make db-bootstrap ARGS="--reset --force"
+```
+
+Le script n'affiche jamais que le nom d'hôte, jamais les identifiants : l'URL complète ne se
+retrouve donc ni dans un terminal partagé, ni dans un journal de CI.
 
 ## Tests
 
