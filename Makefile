@@ -1,7 +1,7 @@
 COMPOSE_FILE := infra/docker/docker-compose.yml
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 
-.PHONY: help build start stop restart logs test test-frontend lint ci reset clean
+.PHONY: help build start stop restart logs test test-frontend lint ci db-reset reset clean
 
 help:
 	@echo "Cibles disponibles :"
@@ -14,7 +14,8 @@ help:
 	@echo "  make test          Tests backend (unitaires + integration)"
 	@echo "  make test-frontend Tests frontend (composants dans jsdom)"
 	@echo "  make ci            Rejouer localement les verifications du pipeline"
-	@echo "  make reset         Repartir d'une base vierge"
+	@echo "  make db-reset      Vider la base locale et rejouer les donnees de demo"
+	@echo "  make reset         Repartir d'une base vierge (reconstruit aussi les images)"
 	@echo "  make clean         Tout supprimer (conteneurs, volumes, images)"
 
 build:
@@ -45,6 +46,15 @@ test-frontend:
 # avant de pousser, plutot que d'attendre le run de la CI.
 ci: lint test test-frontend
 	cd frontend && npm run build
+
+# Vide la base LOCALE uniquement : la commande passe par docker compose, qui ne
+# connait que les conteneurs de cette machine. Render n'est joignable que par son
+# URL externe et n'est donc jamais atteint par une cible make.
+db-reset:
+	$(COMPOSE) exec -T db psql -U devops -d tasksdb -c \
+		"TRUNCATE TABLE refresh_tokens, tasks, projects, users, teams RESTART IDENTITY CASCADE;"
+	$(COMPOSE) exec -T db psql -U devops -d tasksdb -f /docker-entrypoint-initdb.d/01-init.sql
+	@echo "Base locale reinitialisee avec les donnees de demo."
 
 reset:
 	$(COMPOSE) down -v

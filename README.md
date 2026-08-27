@@ -137,8 +137,13 @@ disparaît à la fermeture de l'onglet. Ce compromis est documenté dans `docs/d
 | `make test` | Tests backend (unitaires + intégration) dans Docker |
 | `make test-frontend` | Tests frontend (composants montés dans jsdom) |
 | `make ci` | Rejoue localement l'enchaînement du pipeline |
-| `make reset` | Rejoue le schéma SQL depuis zéro (nécessaire après une migration) |
+| `make db-reset` | Vide la base **locale** et rejoue les données de démo |
+| `make reset` | Repart d'une base vierge et reconstruit les images |
 | `make clean` | Supprime services, volumes et images locales |
+
+Les cibles `make` passent toutes par Docker Compose : elles n'agissent que sur les conteneurs
+de la machine locale. Aucune ne peut atteindre la base Render, qui n'est joignable que par son
+URL externe.
 
 ## Tests
 
