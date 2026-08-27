@@ -1,0 +1,931 @@
+<title>Du local au cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+
+<style>
+  :root {
+    --ground: #eaecef;
+    --surface: #ffffff;
+    --surface-2: #f3f6f8;
+    --ink: #141a21;
+    --ink-soft: #47535f;
+    --ink-faint: #74808c;
+    --line: #d2d9df;
+    --line-strong: #b6c0c8;
+    --accent: #1f5c73;
+    --accent-soft: #dde9ee;
+    --ochre: #9c6d1a;
+    --ochre-soft: #f2e8d4;
+    --ok: #2f6b45;
+    --fail: #9e3a2b;
+    --shadow: 0 1px 2px rgba(20, 26, 33, .06), 0 8px 24px rgba(20, 26, 33, .05);
+
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #10161b;
+      --surface: #171f26;
+      --surface-2: #1d262e;
+      --ink: #e7ebef;
+      --ink-soft: #a5b0ba;
+      --ink-faint: #7c8993;
+      --line: #2a353e;
+      --line-strong: #3a4954;
+      --accent: #74bcd4;
+      --accent-soft: #16303b;
+      --ochre: #d9a34a;
+      --ochre-soft: #2e2515;
+      --ok: #6fbf8c;
+      --fail: #e08272;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #10161b;
+    --surface: #171f26;
+    --surface-2: #1d262e;
+    --ink: #e7ebef;
+    --ink-soft: #a5b0ba;
+    --ink-faint: #7c8993;
+    --line: #2a353e;
+    --line-strong: #3a4954;
+    --accent: #74bcd4;
+    --accent-soft: #16303b;
+    --ochre: #d9a34a;
+    --ochre-soft: #2e2515;
+    --ok: #6fbf8c;
+    --fail: #e08272;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Rail d'etat ---------- */
+  .rail {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px clamp(16px, 4vw, 56px);
+    background: color-mix(in srgb, var(--ground) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .rail strong { color: var(--ink-soft); font-weight: 600; }
+  .rail-section { flex: 1; text-align: center; color: var(--accent); }
+  .rail-count { font-variant-numeric: tabular-nums; }
+
+  .progress {
+    position: fixed;
+    top: 0; left: 0;
+    z-index: 21;
+    height: 2px;
+    width: 0;
+    background: var(--accent);
+    transition: width .25s ease;
+  }
+  @media (prefers-reduced-motion: reduce) { .progress { transition: none; } }
+
+  /* ---------- Diapositives ---------- */
+  .deck {
+    height: 100vh;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+  }
+  @media (prefers-reduced-motion: reduce) { .deck { scroll-behavior: auto; } }
+
+  .slide {
+    scroll-snap-align: start;
+    min-height: 100vh;
+    display: grid;
+    align-content: center;
+    padding: 84px clamp(20px, 6vw, 96px) 72px;
+  }
+  .inner { width: 100%; max-width: 1080px; margin: 0 auto; }
+
+  /* ---------- Typographie ---------- */
+  .eyebrow {
+    margin: 0 0 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .eyebrow .num { color: var(--ink-faint); }
+
+  h1 {
+    margin: 0;
+    font-family: var(--sans);
+    font-size: clamp(2.6rem, 7vw, 5rem);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -.025em;
+    text-wrap: balance;
+  }
+  h2 {
+    margin: 0 0 10px;
+    font-family: var(--sans);
+    font-size: clamp(1.7rem, 3.6vw, 2.7rem);
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+  }
+  h3 {
+    margin: 0 0 6px;
+    font-family: var(--sans);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -.005em;
+  }
+  .lede {
+    max-width: 62ch;
+    margin: 0 0 34px;
+    font-size: clamp(1.02rem, 1.5vw, 1.2rem);
+    color: var(--ink-soft);
+    text-wrap: pretty;
+  }
+  p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 500; color: var(--ink); }
+  em { font-style: italic; }
+  .mono { font-family: var(--mono); font-size: .88em; }
+  .quiet { color: var(--ink-faint); }
+
+  /* ---------- Blocs ---------- */
+  .card {
+    padding: 20px 22px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+  }
+  .grid { display: grid; gap: 16px; }
+  .g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  @media (max-width: 860px) {
+    .g2, .g3, .g4 { grid-template-columns: 1fr; }
+  }
+
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat .value {
+    font-family: var(--sans);
+    font-size: clamp(1.9rem, 4vw, 2.7rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- Tableaux ---------- */
+  .scroller { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .93rem;
+  }
+  th, td {
+    padding: 11px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom-color: var(--line-strong);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ---------- Etats ---------- */
+  .pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    white-space: nowrap;
+  }
+  .pill-ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .pill-fail { color: var(--fail); background: color-mix(in srgb, var(--fail) 12%, transparent); }
+  .pill-flat { color: var(--ink-faint); background: var(--surface-2); }
+  .pill-accent { color: var(--accent); background: var(--accent-soft); }
+
+  /* ---------- Console ---------- */
+  .console {
+    padding: 16px 18px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: .84rem;
+    line-height: 1.75;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--ink-soft);
+  }
+  .console b { color: var(--ink); font-weight: 600; }
+  .console .ok { color: var(--ok); font-weight: 600; }
+  .console .ko { color: var(--fail); font-weight: 600; }
+  .console .dim { color: var(--ink-faint); }
+
+  /* ---------- Diagramme ---------- */
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+  .node {
+    flex: 1 1 200px;
+    min-width: 0;
+    padding: 18px 20px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+  }
+  .node .tier {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .node .tech {
+    font-family: var(--sans);
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .node .detail {
+    margin-top: 6px;
+    font-size: .86rem;
+    color: var(--ink-soft);
+  }
+  .link {
+    flex: 0 0 auto;
+    align-self: center;
+    padding: 0 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    text-align: center;
+    white-space: nowrap;
+  }
+  .link .arrow { display: block; font-size: 18px; color: var(--line-strong); line-height: 1; }
+  @media (max-width: 860px) {
+    .flow { flex-direction: column; }
+    .link { padding: 8px 0; }
+    .link .arrow { transform: rotate(90deg); }
+  }
+
+  /* ---------- Chaine du pipeline ---------- */
+  .chain { display: flex; flex-direction: column; gap: 0; }
+  .stage {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    gap: 18px;
+    align-items: baseline;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .stage:last-child { border-bottom: none; }
+  .stage .who {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .stage .what { color: var(--ink-soft); font-size: .95rem; }
+  .stage .what b { color: var(--ink); font-weight: 500; }
+  @media (max-width: 700px) {
+    .stage { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  /* ---------- Notes en marge ---------- */
+  .note {
+    margin-top: 26px;
+    padding-left: 16px;
+    border-left: 2px solid var(--ochre);
+    font-size: .95rem;
+    color: var(--ink-soft);
+    max-width: 68ch;
+  }
+  .note b { color: var(--ink); font-weight: 500; }
+
+  ul { margin: 0; padding-left: 1.1em; }
+  li { margin-bottom: 7px; }
+  li::marker { color: var(--line-strong); }
+
+  /* ---------- Titre ---------- */
+  .title-slide .inner { max-width: 940px; }
+  .title-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    margin-top: 40px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line-strong);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .title-meta span b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---------- Navigation ---------- */
+  .nav {
+    position: fixed;
+    right: clamp(14px, 3vw, 32px);
+    bottom: clamp(14px, 3vw, 28px);
+    z-index: 20;
+    display: flex;
+    gap: 6px;
+  }
+  .nav button {
+    width: 38px; height: 38px;
+    display: grid; place-items: center;
+    background: var(--surface);
+    color: var(--ink-soft);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 15px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  .nav button:hover { color: var(--accent); border-color: var(--accent); }
+  .nav button:disabled { opacity: .35; cursor: default; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .hint {
+    position: fixed;
+    left: clamp(16px, 4vw, 56px);
+    bottom: clamp(14px, 3vw, 28px);
+    z-index: 20;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  @media (max-width: 700px) { .hint { display: none; } }
+
+  @media print {
+    .rail, .nav, .hint, .progress { display: none; }
+    .deck { height: auto; overflow: visible; }
+    .slide { min-height: auto; page-break-after: always; padding: 28px 0; }
+  }
+</style>
+
+<div class="progress" id="progress"></div>
+
+<header class="rail">
+  <strong>DevOps Tasks Board</strong>
+  <span class="rail-section" id="railSection">Introduction</span>
+  <span class="rail-count"><span id="railNum">1</span>&thinsp;/&thinsp;10</span>
+</header>
+
+<main class="deck" id="deck">
+
+  <!-- 1 -->
+  <section class="slide title-slide" data-section="Introduction">
+    <div class="inner">
+      <p class="eyebrow">CESI &middot; INFAL127 &middot; INFAL245 &middot; Jour 4</p>
+      <h1>Du local au cloud</h1>
+      <p class="lede" style="margin-top:22px">
+        Une application 3&nbsp;tiers menée du poste de développement jusqu'à la production,
+        en passant par la conteneurisation, l'orchestration et l'intégration continue.
+      </p>
+      <div class="title-meta">
+        <span><b>Application</b> &nbsp;Tasks Board</span>
+        <span><b>Stack</b> &nbsp;React 19 &middot; Node 22 &middot; PostgreSQL 15</span>
+        <span><b>Production</b> &nbsp;Render</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide" data-section="Architecture">
+    <div class="inner">
+      <p class="eyebrow"><span class="num">02</span> &nbsp;Architecture</p>
+      <h2>Trois tiers, trois responsabilités</h2>
+      <p class="lede">
+        Chaque étage ne parle qu'à son voisin. Le navigateur ne voit jamais la base ;
+        seule l'API y accède, et elle est la seule à détenir les identifiants.
+      </p>
+
+      <div class="flow">
+        <div class="node">
+          <div class="tier">Présentation</div>
+          <div class="tech">React 19 + Vite 6</div>
+          <div class="detail">Tableau de tâches, écran de connexion, panneau d'équipe.</div>
+        </div>
+        <div class="link"><span class="arrow">&rarr;</span>HTTP / JSON<br>jeton porteur</div>
+        <div class="node">
+          <div class="tier">Application</div>
+          <div class="tech">Node 22 + Express 5</div>
+          <div class="detail">14 routes REST, authentification, cloisonnement par équipe.</div>
+        </div>
+        <div class="link"><span class="arrow">&rarr;</span>TCP 5432<br>requêtes paramétrées</div>
+        <div class="node">
+          <div class="tier">Données</div>
+          <div class="tech">PostgreSQL 15</div>
+          <div class="detail">5 tables, contraintes d'intégrité, volume persistant.</div>
+        </div>
+      </div>
+
+      <div class="note">
+        <b>Une seule source pour le schéma.</b> Le fichier <span class="mono">infra/db/init_db.sql</span>
+        initialise la base dans les trois environnements. Modifier le schéma une fois suffit :
+        Docker Compose, Kubernetes et Render appliquent le même fichier.
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide" data-section="Environnements">
+    <div class="inner">
+      <p class="eyebrow"><span class="num">03</span> &nbsp;Environnements</p>
+      <h2>Trois chemins d'exécution</h2>
+      <p class="lede">
+        Le même code source tourne de trois façons différentes, pour trois usages qui n'ont
+        pas les mêmes exigences.
+      </p>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr>
+              <th>Environnement</th>
+              <th>Exécuté par</th>
+              <th>Sert à</th>
+              <th>Code source</th>
+              <th>Accès</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Local</strong></td>
+              <td>Docker Compose</td>
+              <td>Développer</td>
+              <td>monté depuis le disque, rechargé à chaud</td>
+              <td class="num">:5173</td>
+            </tr>
+            <tr>
+              <td><strong>Cluster</strong></td>
+              <td>Kubernetes</td>
+              <td>Démontrer l'orchestration</td>
+              <td>figé dans l'image</td>
+              <td class="num">:30080</td>
+            </tr>
+            <tr>
+              <td><strong>Production</strong></td>
+              <td>Render</td>
+              <td>Servir les utilisateurs</td>
+              <td>construit par la plateforme</td>
+              <td class="num">onrender.com</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <b>Une limite que j'assume.</b> Render reconstruit son propre artefact et n'utilise ni mes
+        Dockerfiles ni mes manifests. L'image que le pipeline teste n'est donc pas exactement celle
+        qui tourne en production. Une chaîne mature publierait l'image sur un registre et déploierait
+        <em>celle-là</em> partout — <span class="mono">build once, deploy anywhere</span>.
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide" data-section="Intégration continue">
+    <div class="inner">
+      <p class="eyebrow"><span class="num">04</span> &nbsp;Intégration continue</p>
+      <h2>Chaque étage garde le suivant</h2>
+      <p class="lede">
+        Un push sur <span class="mono">main</span> déclenche la chaîne. Aucun étage ne démarre si
+        le précédent a échoué : une régression ne peut pas atteindre la production.
+      </p>
+
+      <div class="chain">
+        <div class="stage">
+          <div class="who">Lint</div>
+          <div class="what">ESLint sur le backend et le frontend, <b>mêmes règles qu'en local</b></div>
+          <div><span class="pill pill-flat">2 jobs</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">Tests back</div>
+          <div class="what">Unitaires <b>et intégration sur un vrai PostgreSQL 15</b> démarré à côté du job</div>
+          <div><span class="pill pill-flat">48 tests</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">Tests front</div>
+          <div class="what">Composants montés dans jsdom, puis <b>build de production</b></div>
+          <div><span class="pill pill-flat">18 tests</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">Images</div>
+          <div class="what">Construction des deux images Docker — garantit que le déploiement Kubernetes reste possible</div>
+          <div><span class="pill pill-flat">2 images</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">Déploiement</div>
+          <div class="what">Deploy hooks Render, <b>uniquement depuis <span class="mono">main</span></b></div>
+          <div><span class="pill pill-accent">prod</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">Vérification</div>
+          <div class="what">Interrogation de <span class="mono">/health</span> sur l'URL publique <b>jusqu'à réponse saine</b></div>
+          <div><span class="pill pill-ok">200</span></div>
+        </div>
+      </div>
+
+      <div class="note">
+        <b>Le dernier étage ne dit pas « déployé », il dit « qui répond ».</b>
+        Comme <span class="mono">/health</span> exécute un vrai <span class="mono">SELECT 1</span>,
+        un déploiement n'est validé que si l'application <em>et</em> sa base répondent.
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide" data-section="Authentification">
+    <div class="inner">
+      <p class="eyebrow"><span class="num">05</span> &nbsp;Authentification</p>
+      <h2>Une équipe, un code, deux jetons</h2>
+      <p class="lede">
+        Une équipe est un espace fermé. On y entre en la créant — on en devient chef —
+        ou avec le code à 6 chiffres remis par le chef.
+      </p>
+
+      <div class="grid g2">
+        <div class="card">
+          <h3>Jeton d'accès</h3>
+          <p class="quiet mono" style="font-size:12px;letter-spacing:.06em">15 MINUTES &middot; EN MÉMOIRE</p>
+          <p>Accompagne chaque requête. Ne touche jamais le disque et disparaît à la fermeture de l'onglet.</p>
+        </div>
+        <div class="card">
+          <h3>Jeton de rafraîchissement</h3>
+          <p class="quiet mono" style="font-size:12px;letter-spacing:.06em">7 JOURS &middot; STOCKÉ EN BASE</p>
+          <p>Sert uniquement à obtenir une nouvelle paire. Sa présence en base rend la déconnexion réelle.</p>
+        </div>
+      </div>
+
+      <div class="console" style="margin-top:18px">1. connexion         <span class="dim">→</span> accès + rafraîchissement
+2. rafraîchissement  <span class="dim">→</span> nouvelle paire, <b>l'ancienne est consommée</b>
+3. rejeu de l'ancien <span class="dim">→</span> <span class="ko">session compromise, reconnexion requise</span>
+4. jeton légitime    <span class="dim">→</span> <span class="ko">révoqué lui aussi</span>
+5. en base           <span class="dim">→</span> 0 actif, 2 révoqués</div>
+
+      <div class="note">
+        <b>Pourquoi couper la session légitime aussi ?</b> Quand un jeton déjà consommé revient,
+        impossible de savoir si c'est le voleur ou la victime qui l'envoie. On révoque tout et on
+        redemande une connexion. La fenêtre d'exploitation passe de 8&nbsp;heures à 15&nbsp;minutes.
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide" data-section="Sécurité">
+    <div class="inner">
+      <p class="eyebrow"><span class="num">06</span> &nbsp;Sécurité</p>
+      <h2>Une vulnérabilité identifiée, mesurée, traitée</h2>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr><th>Menace</th><th>Contre-mesure</th><th>État</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Force brute sur le code à 6 chiffres<br><span class="quiet" style="font-size:.86rem">un million de combinaisons, épuisables en minutes</span></td>
+              <td>5 tentatives par quart d'heure, rotation du code par le chef, code jamais transmis aux membres</td>
+              <td><span class="pill pill-ok">traité</span></td>
+            </tr>
+            <tr>
+              <td>Vol de mot de passe en cas de fuite de la base</td>
+              <td>bcrypt à 12 tours, salage automatique — deux comptes au même mot de passe n'ont pas le même hash</td>
+              <td><span class="pill pill-ok">traité</span></td>
+            </tr>
+            <tr>
+              <td>Énumération des comptes existants</td>
+              <td>Email inconnu et mot de passe faux renvoient <em>exactement</em> la même réponse</td>
+              <td><span class="pill pill-ok">traité</span></td>
+            </tr>
+            <tr>
+              <td>Accès aux données d'une autre équipe</td>
+              <td>Le filtre vient du jeton signé, jamais d'un paramètre — donc rien à falsifier côté client</td>
+              <td><span class="pill pill-ok">traité</span></td>
+            </tr>
+            <tr>
+              <td>Secret de signature connu de tous</td>
+              <td>Le backend <b>refuse de démarrer</b> sans <span class="mono">JWT_SECRET</span> plutôt que d'utiliser une valeur par défaut</td>
+              <td><span class="pill pill-ok">traité</span></td>
+            </tr>
+            <tr>
+              <td>Lecture du jeton par un script injecté (XSS)</td>
+              <td>Un cookie <span class="mono">httpOnly</span> y résisterait, mais impose une configuration inter-domaines fragile entre les deux services Render</td>
+              <td><span class="pill pill-fail">résiduel</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <b>Le risque résiduel est un choix, pas un oubli.</b> Il est documenté, et sa contrepartie
+        est réduite : seul le jeton de rafraîchissement est stocké, le jeton d'accès reste en mémoire.
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide" data-section="Kubernetes">
+    <div class="inner">
+      <p class="eyebrow"><span class="num">07</span> &nbsp;Orchestration</p>
+      <h2>L'infrastructure a dicté l'architecture</h2>
+      <p class="lede">
+        Le backend tourne en deux exemplaires. Deux pods ne partagent pas leur mémoire — une session
+        stockée côté serveur serait invisible de l'un à l'autre. <strong>C'est cette contrainte qui
+        impose une authentification sans état.</strong>
+      </p>
+
+      <div class="grid g2">
+        <div>
+          <h3 style="margin-bottom:10px">Un jeton émis par un pod, présenté à l'autre</h3>
+          <div class="console">connexion dans le pod A
+  <span class="dim">→</span> eyJhbGciOiJIUzI1NiIs…
+
+même jeton dans le pod B
+  <span class="dim">→</span> <span class="ok">HTTP 200</span> · 5 tâches lues</div>
+        </div>
+        <div>
+          <h3 style="margin-bottom:10px">Un pod supprimé, remplacé sans coupure</h3>
+          <div class="console"><span class="dim">t+3s</span>   pods prêts 1/2   API <span class="ok">200</span>
+<span class="dim">t+6s</span>   pods prêts 1/2   API <span class="ok">200</span>
+<span class="dim">t+9s</span>   pods prêts 2/2   API <span class="ok">200</span>
+
+<span class="dim">l'API n'a jamais cessé de répondre</span></div>
+        </div>
+      </div>
+
+      <div class="grid g4" style="margin-top:26px">
+        <div class="stat"><span class="value">9</span><span class="label">Manifests</span></div>
+        <div class="stat"><span class="value">4</span><span class="label">Pods</span></div>
+        <div class="stat"><span class="value">2</span><span class="label">Répliques API</span></div>
+        <div class="stat"><span class="value">1&nbsp;Gi</span><span class="label">Volume persistant</span></div>
+      </div>
+
+      <div class="note">
+        <b>La sonde détecte plus qu'un crash.</b> Elle exécute un <span class="mono">SELECT 1</span> :
+        un backend vivant mais incapable de joindre la base est redémarré, ce que Docker Compose ne
+        sait pas faire. Le seuil est fixé à 6 échecs pour qu'une base momentanément indisponible ne
+        déclenche pas une boucle de redémarrages.
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide" data-section="Données">
+    <div class="inner">
+      <p class="eyebrow"><span class="num">08</span> &nbsp;Données</p>
+      <h2>Un plan de reprise, pas une intention</h2>
+      <p class="lede">
+        La base managée est supprimée au bout de 30 jours sur le plan gratuit. La procédure de
+        reprise est outillée et a déjà servi.
+      </p>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr><th>Commande</th><th>Cible</th><th>Effet</th><th>Protection</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">make db-reset</td>
+              <td>Locale, toujours</td>
+              <td>Vide et recharge les données de démonstration</td>
+              <td class="quiet">passe par Docker Compose</td>
+            </tr>
+            <tr>
+              <td class="mono">make db-bootstrap</td>
+              <td>Désignée par l'URL</td>
+              <td>Crée ce qui manque, laisse le reste intact</td>
+              <td class="quiet">idempotent</td>
+            </tr>
+            <tr>
+              <td class="mono">make db-suppr</td>
+              <td>Désignée par l'URL</td>
+              <td>Supprime les tables elles-mêmes</td>
+              <td><b>« supprimer » à taper</b>, refus sans clavier</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <b>Le script de restauration n'est pas théorique.</b> C'est lui qui a migré la base de
+        production lors de l'ajout de l'authentification, sans interruption ni perte de données —
+        parce que le fichier SQL est écrit pour s'appliquer aussi bien à une base vierge qu'à une
+        base déjà peuplée.
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide" data-section="Incidents">
+    <div class="inner">
+      <p class="eyebrow"><span class="num">09</span> &nbsp;Retour d'expérience</p>
+      <h2>Trois pannes, trois leçons</h2>
+
+      <div class="grid g3">
+        <div class="card">
+          <span class="pill pill-fail">Page blanche</span>
+          <h3 style="margin-top:12px">Le serveur répondait 200</h3>
+          <p class="quiet" style="font-size:.93rem">
+            HTML, CSS, JavaScript : tout arrivait correctement. Mais le bundle plantait au démarrage,
+            faute d'un plugin jamais branché dans la configuration de build.
+          </p>
+          <p style="font-size:.93rem"><b>Leçon</b> — un <span class="mono">200</span> sur une application
+          monopage ne prouve rien. <span class="mono">curl</span> n'exécute jamais le JavaScript.</p>
+        </div>
+        <div class="card">
+          <span class="pill pill-fail">503 en boucle</span>
+          <h3 style="margin-top:12px">Une variable jamais déclarée</h3>
+          <p class="quiet" style="font-size:.93rem">
+            Le service redémarrait sans fin en production. Les variables avaient été mises dans un
+            groupe non rattaché au service.
+          </p>
+          <p style="font-size:.93rem"><b>Leçon</b> — une sonde qui teste vraiment la base transforme
+          une panne opaque en diagnostic de 30 secondes.</p>
+        </div>
+        <div class="card">
+          <span class="pill pill-fail">Formulaire bloqué</span>
+          <h3 style="margin-top:12px">Un message pour quatre causes</h3>
+          <p class="quiet" style="font-size:.93rem">
+            Impossible de créer une équipe. Quatre erreurs distinctes renvoyaient le même texte,
+            et la règle du mot de passe n'était écrite nulle part.
+          </p>
+          <p style="font-size:.93rem"><b>Leçon</b> — le backend était correct, les tests passaient,
+          la sécurité était bonne. L'application était quand même inutilisable.</p>
+        </div>
+      </div>
+
+      <div class="note">
+        Les trois ont un point commun : <b>ce qui était vérifié n'était pas ce qui comptait.</b>
+        Chacune a produit un test qui l'aurait attrapée.
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide" data-section="Démonstration">
+    <div class="inner">
+      <p class="eyebrow"><span class="num">10</span> &nbsp;Démonstration</p>
+      <h2>Ce que je vais montrer</h2>
+
+      <div class="chain" style="margin-bottom:8px">
+        <div class="stage">
+          <div class="who">Local</div>
+          <div class="what"><span class="mono">make start</span> — les trois tiers, données de démonstration affichées</div>
+          <div><span class="pill pill-flat">2 s</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">Rôles</div>
+          <div class="what">Connexion chef puis membre — le code d'invitation disparaît, les boutons aussi</div>
+          <div><span class="pill pill-accent">403</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">API</div>
+          <div class="what"><span class="mono">curl</span> direct sur une route réservée — <b>contourner l'interface ne contourne pas la règle</b></div>
+          <div><span class="pill pill-fail">403</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">Cluster</div>
+          <div class="what"><span class="mono">kubectl delete pod</span> — l'API continue de répondre pendant le remplacement</div>
+          <div><span class="pill pill-ok">200</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">Pipeline</div>
+          <div class="what">Un commit poussé, la chaîne complète jusqu'au redéploiement Render</div>
+          <div><span class="pill pill-ok">vert</span></div>
+        </div>
+        <div class="stage">
+          <div class="who">Production</div>
+          <div class="what">Ajout d'une tâche en ligne, vérification en base</div>
+          <div><span class="pill pill-accent">live</span></div>
+        </div>
+      </div>
+
+      <div class="grid g4" style="margin-top:28px">
+        <div class="stat"><span class="value">38</span><span class="label">Commits</span></div>
+        <div class="stat"><span class="value">66</span><span class="label">Tests</span></div>
+        <div class="stat"><span class="value">3</span><span class="label">Environnements</span></div>
+        <div class="stat"><span class="value">14</span><span class="label">Routes API</span></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="nav" aria-label="Navigation">
+  <button id="prev" type="button" aria-label="Diapositive précédente">&uarr;</button>
+  <button id="next" type="button" aria-label="Diapositive suivante">&darr;</button>
+</nav>
+<p class="hint">&larr; &rarr; ou espace pour naviguer</p>
+
+<script>
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll('.slide'));
+  const railNum = document.getElementById('railNum');
+  const railSection = document.getElementById('railSection');
+  const progress = document.getElementById('progress');
+  const prev = document.getElementById('prev');
+  const next = document.getElementById('next');
+  let current = 0;
+
+  function setCurrent(index) {
+    current = index;
+    railNum.textContent = index + 1;
+    railSection.textContent = slides[index].dataset.section;
+    progress.style.width = ((index + 1) / slides.length * 100) + '%';
+    prev.disabled = index === 0;
+    next.disabled = index === slides.length - 1;
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) setCurrent(slides.indexOf(entry.target));
+    });
+  }, { root: deck, threshold: 0.55 });
+  slides.forEach((slide) => observer.observe(slide));
+
+  function go(delta) {
+    const target = Math.min(slides.length - 1, Math.max(0, current + delta));
+    slides[target].scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  prev.addEventListener('click', () => go(-1));
+  next.addEventListener('click', () => go(1));
+
+  document.addEventListener('keydown', (event) => {
+    const forward = ['ArrowRight', 'ArrowDown', 'PageDown', ' '];
+    const back = ['ArrowLeft', 'ArrowUp', 'PageUp'];
+    if (forward.includes(event.key)) { event.preventDefault(); go(1); }
+    else if (back.includes(event.key)) { event.preventDefault(); go(-1); }
+    else if (event.key === 'Home') { event.preventDefault(); go(-slides.length); }
+    else if (event.key === 'End') { event.preventDefault(); go(slides.length); }
+  });
+
+  setCurrent(0);
+</script>
