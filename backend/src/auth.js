@@ -1,0 +1,124 @@
+import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+// Cout du hachage bcrypt. 12 tours represente environ 250 ms de calcul : assez
+// lent pour rendre une attaque par dictionnaire couteuse, assez rapide pour ne
+// pas degrader la connexion d'un utilisateur legitime.
+const SALT_ROUNDS = 12;
+const TOKEN_TTL = '8h';
+
+// Aucune valeur par defaut n'est prevue : un secret code en dur serait present
+// dans le depot, donc connu de tous, et signerait des jetons falsifiables.
+// L'application refuse de demarrer plutot que de tourner avec une securite
+// factice. Le secret est fourni par docker-compose, le Secret Kubernetes ou
+// les variables d'environnement Render.
+export const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error(
+    'JWT_SECRET est obligatoire. Definissez-le dans votre environnement ' +
+      '(voir backend/.env.example) avant de demarrer le backend.',
+  );
+}
+
+export const PASSWORD_MIN_LENGTH = 8;
+
+export function validateEmail(email) {
+  return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+// Une longueur minimale accompagnee d'un melange lettres/chiffres. On ne va pas
+// plus loin volontairement : imposer des regles complexes pousse a reutiliser
+// des mots de passe, c'est la recommandation de l'ANSSI et du NIST.
+export function validatePassword(password) {
+  return (
+    typeof password === 'string' &&
+    password.length >= PASSWORD_MIN_LENGTH &&
+    /[a-zA-Z]/.test(password) &&
+    /[0-9]/.test(password)
+  );
+}
+
+export function validateJoinCode(code) {
+  return typeof code === 'string' && /^[0-9]{6}$/.test(code.trim());
+}
+
+export function validateDisplayName(name) {
+  return typeof name === 'string' && name.trim().length >= 2 && name.trim().length <= 120;
+}
+
+export function validateCredentialsPayload(payload = {}) {
+  return (
+    validateEmail(payload.email) &&
+    validatePassword(payload.password) &&
+    validateDisplayName(payload.displayName)
+  );
+}
+
+// crypto.randomInt utilise le generateur cryptographique du systeme, contrairement
+// a Math.random dont la suite est previsible : un code d'equipe devinable
+// annulerait la protection de l'espace de travail.
+export function generateJoinCode() {
+  return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+}
+
+export function hashPassword(password) {
+  return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+export function verifyPassword(password, hash) {
+  return bcrypt.compare(password, hash);
+}
+
+export function signToken(user) {
+  return jwt.sign(
+    { sub: String(user.id), teamId: user.team_id, role: user.role, name: user.display_name },
+    JWT_SECRET,
+    { expiresIn: TOKEN_TTL },
+  );
+}
+
+export function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+
+function readBearerToken(request) {
+  const header = request.headers.authorization ?? '';
+  const [scheme, token] = header.split(' ');
+  return scheme === 'Bearer' && token ? token : null;
+}
+
+// Middleware place devant toutes les routes metier. Il resout l'identite une
+// seule fois et depose req.user ; les routes n'ont plus a se demander qui
+// appelle, elles filtrent simplement sur req.user.teamId.
+export function requireAuth(request, response, next) {
+  const token = readBearerToken(request);
+  const payload = token ? verifyToken(token) : null;
+
+  if (!payload) {
+    return response.status(401).json({ error: 'Authentification requise' });
+  }
+
+  request.user = {
+    id: Number(payload.sub),
+    teamId: payload.teamId,
+    role: payload.role,
+    displayName: payload.name,
+  };
+  next();
+}
+
+// Le code d'equipe est un secret d'administration : seul le chef le lit et le
+// fait tourner. Un membre qui obtiendrait le code pourrait inviter n'importe
+// qui sans que le chef le sache.
+export function requireLead(request, response, next) {
+  if (request.user?.role !== 'lead') {
+    return response.status(403).json({ error: "Reserve au chef d'equipe" });
+  }
+  next();
+}
