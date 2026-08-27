@@ -22,6 +22,10 @@ services:
     environment:
       PORT: 3000
       DATABASE_URL: postgres://devops:devops@db:5432/tasksdb
+      # Secret de developpement uniquement : il est en clair dans le depot, donc
+      # public. Les environnements Kubernetes et Render utilisent leur propre
+      # valeur, generee aleatoirement et jamais versionnee.
+      JWT_SECRET: dev-only-secret-not-for-production
     ports:
       - "3000:3000"
     volumes:

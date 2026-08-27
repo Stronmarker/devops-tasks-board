@@ -38,6 +38,14 @@ spec:
                 secretKeyRef:
                   name: tasks-secret
                   key: DATABASE_URL
+            # Sans cette cle le backend refuse de demarrer : c'est voulu, un
+            # secret manquant doit faire echouer le deploiement, pas produire
+            # une application qui signe des jetons avec une valeur par defaut.
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tasks-secret
+                  key: JWT_SECRET
           livenessProbe:
             httpGet:
               path: /health

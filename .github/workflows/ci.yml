@@ -69,6 +69,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://devops:devops@localhost:5432/tasksdb
+      # Secret de test, sans valeur au-dela du job : il ne signe que les jetons
+      # fabriques et verifies pendant la suite de tests.
+      JWT_SECRET: ci-test-secret
     steps:
       - uses: actions/checkout@v4
 
