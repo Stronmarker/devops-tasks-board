@@ -36,10 +36,12 @@ const writeRefreshToken = (token) => {
 };
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, fields) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    // Detail par champ renvoye par le serveur pour les erreurs de validation.
+    this.fields = fields;
   }
 }
 
@@ -109,7 +111,7 @@ export async function apiFetch(path, { method = 'GET', body, retry = true } = {}
   }
 
   if (!response.ok) {
-    throw new ApiError(payload.error || 'Une erreur est survenue', response.status);
+    throw new ApiError(payload.error || 'Une erreur est survenue', response.status, payload.fields);
   }
 
   return payload;

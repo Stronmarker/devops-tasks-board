@@ -69,6 +69,44 @@ describe('Sans session', () => {
     expect(screen.getByLabelText("Nom de l'equipe")).toBeDefined();
   });
 
+  it('annonce la regle du mot de passe avant toute saisie', () => {
+    mockApi({});
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Creer une equipe' }));
+    // La contrainte doit etre lisible des l'arrivee : la decouvrir au moment du
+    // refus est la premiere cause d'abandon sur un formulaire d'inscription.
+    expect(screen.getByText('8 caracteres minimum, avec au moins une lettre et un chiffre')).toBeDefined();
+  });
+
+  it('affiche l erreur sous le champ fautif et le marque invalide', async () => {
+    mockApi({
+      'POST /auth/teams': {
+        status: 400,
+        body: {
+          error: 'Mot de passe invalide',
+          fields: { password: 'Mot de passe : 8 caracteres minimum, avec au moins une lettre et un chiffre' },
+        },
+      },
+    });
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Creer une equipe' }));
+    fireEvent.change(screen.getByLabelText("Nom de l'equipe"), { target: { value: 'Mon equipe' } });
+    fireEvent.change(screen.getByLabelText('Votre nom'), { target: { value: 'Alex' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'alex@test.fr' } });
+    fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'motdepasse' } });
+    fireEvent.click(screen.getByRole('button', { name: "Creer l'equipe" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Mot de passe').getAttribute('aria-invalid')).toBe('true'),
+    );
+
+    // L'erreur disparait des que l'utilisateur corrige le champ.
+    fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'Motdepasse1' } });
+    expect(screen.getByLabelText('Mot de passe').getAttribute('aria-invalid')).toBeNull();
+  });
+
   it("affiche le message d'erreur renvoye par l'API en cas d'identifiants faux", async () => {
     mockApi({ 'POST /auth/login': { status: 401, body: { error: 'Identifiants invalides' } } });
     render(<App />);

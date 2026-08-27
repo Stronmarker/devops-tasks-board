@@ -74,7 +74,8 @@ h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
 .auth-tab.is-active { background: #355c50; color: #fffaf0; border-color: #355c50; }
 .auth-form { display: flex; flex-direction: column; gap: 14px; }
 .auth-hint { margin: 0; color: #68766c; font: 0.86rem/1.5 sans-serif; }
-.auth-field { display: flex; flex-direction: column; gap: 6px; font: 700 0.82rem sans-serif; }
+.auth-field { display: flex; flex-direction: column; gap: 6px; }
+.auth-field > label { font: 700 0.82rem sans-serif; }
 .auth-field input { width: 100%; }
 .primary { background: #bc5a3c; }
 
@@ -89,3 +90,8 @@ h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
   .form-row { display: grid; grid-template-columns: 1fr; }
   .board { display: grid; grid-template-columns: 1fr; }
 }
+
+/* --- Aide et erreurs de champ ----------------------------------------- */
+.field-hint { color: #68766c; font: 400 0.76rem/1.4 sans-serif; }
+.field-error { color: #9f2e25; font: 700 0.76rem/1.4 sans-serif; }
+input.has-error { border-color: #9f2e25; border-width: 2px; }
