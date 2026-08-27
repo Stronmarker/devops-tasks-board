@@ -5,10 +5,13 @@ import rateLimit from 'express-rate-limit';
 import pg from 'pg';
 import {
   generateJoinCode,
+  generateRefreshToken,
   hashPassword,
+  hashRefreshToken,
+  refreshExpiryDate,
   requireAuth,
   requireLead,
-  signToken,
+  signAccessToken,
   validateCredentialsPayload,
   validateDisplayName,
   validateJoinCode,
@@ -75,6 +78,17 @@ const authLimiter = rateLimit({
   message: { error: 'Trop de tentatives de connexion. Reessayez dans quelques minutes.' },
 });
 
+// Le rafraichissement est appele automatiquement toutes les quinze minutes par
+// chaque onglet ouvert : sa limite doit etre plus large que celle des routes de
+// connexion, sinon un usage normal la declencherait.
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de rafraichissements. Reessayez dans quelques minutes.' },
+});
+
 const publicUser = (row) => ({
   id: row.id,
   email: row.email,
@@ -82,6 +96,20 @@ const publicUser = (row) => ({
   role: row.role,
   teamId: row.team_id,
 });
+
+// Emet la paire de jetons et enregistre l'empreinte du refresh. Le client
+// (pool ou connexion de transaction) est passe en parametre pour que la
+// creation d'une equipe reste atomique.
+async function issueSession(client, user) {
+  const refreshToken = generateRefreshToken();
+
+  await client.query(
+    'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+    [user.id, hashRefreshToken(refreshToken), refreshExpiryDate()],
+  );
+
+  return { accessToken: signAccessToken(user), refreshToken };
+}
 
 // ---------------------------------------------------------------------------
 // Sante
@@ -126,10 +154,11 @@ app.post('/auth/teams', authLimiter, async (request, response) => {
       [email.trim().toLowerCase(), await hashPassword(password), displayName.trim(), team.rows[0].id],
     );
 
+    const session = await issueSession(client, user.rows[0]);
     await client.query('COMMIT');
 
     response.status(201).json({
-      token: signToken(user.rows[0]),
+      ...session,
       user: publicUser(user.rows[0]),
       team: { name: team.rows[0].name, joinCode: team.rows[0].join_code },
     });
@@ -166,7 +195,8 @@ app.post('/auth/join', joinLimiter, async (request, response) => {
       [email.trim().toLowerCase(), await hashPassword(password), displayName.trim(), team.rows[0].id],
     );
 
-    response.status(201).json({ token: signToken(user.rows[0]), user: publicUser(user.rows[0]) });
+    const session = await issueSession(pool, user.rows[0]);
+    response.status(201).json({ ...session, user: publicUser(user.rows[0]) });
   } catch (error) {
     if (error.code === '23505') {
       return response.status(409).json({ error: 'Cet email est deja utilise' });
@@ -197,9 +227,103 @@ app.post('/auth/login', authLimiter, async (request, response) => {
       return response.status(401).json({ error: 'Identifiants invalides' });
     }
 
-    response.json({ token: signToken(user), user: publicUser(user) });
+    const session = await issueSession(pool, user);
+    response.json({ ...session, user: publicUser(user) });
   } catch (_error) {
     response.status(500).json({ error: 'Connexion impossible' });
+  }
+});
+
+// Echange un jeton de rafraichissement contre une nouvelle paire. C'est la
+// seule route qui prolonge une session.
+app.post('/auth/refresh', refreshLimiter, async (request, response) => {
+  const { refreshToken } = request.body ?? {};
+
+  if (typeof refreshToken !== 'string' || refreshToken.length === 0) {
+    return response.status(400).json({ error: 'Jeton de rafraichissement requis' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const stored = await client.query(
+      `SELECT r.id, r.user_id, r.revoked_at, r.expires_at,
+              u.id AS uid, u.email, u.display_name, u.role, u.team_id
+       FROM refresh_tokens r JOIN users u ON u.id = r.user_id
+       WHERE r.token_hash = $1
+       FOR UPDATE`,
+      [hashRefreshToken(refreshToken)],
+    );
+
+    const row = stored.rows[0];
+
+    if (!row) {
+      await client.query('ROLLBACK');
+      return response.status(401).json({ error: 'Session expiree' });
+    }
+
+    // Un jeton deja consomme qui revient signifie qu'une copie circule : soit
+    // elle a ete volee, soit c'est l'original qui revient apres le vol. On ne
+    // peut pas distinguer les deux, donc on coupe toute la session de
+    // l'utilisateur et on le force a se reconnecter.
+    if (row.revoked_at) {
+      await client.query(
+        'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL',
+        [row.user_id],
+      );
+      await client.query('COMMIT');
+      return response.status(401).json({ error: 'Session compromise, reconnexion requise' });
+    }
+
+    if (new Date(row.expires_at) <= new Date()) {
+      await client.query('ROLLBACK');
+      return response.status(401).json({ error: 'Session expiree' });
+    }
+
+    // Rotation : le jeton presente est consomme et remplace. Un jeton ne sert
+    // donc jamais deux fois, ce qui rend la reutilisation detectable ci-dessus.
+    await client.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1', [row.id]);
+
+    const user = {
+      id: row.uid,
+      email: row.email,
+      display_name: row.display_name,
+      role: row.role,
+      team_id: row.team_id,
+    };
+    const session = await issueSession(client, user);
+
+    await client.query('COMMIT');
+    response.json({ ...session, user: publicUser({ ...user, id: row.uid }) });
+  } catch (_error) {
+    await client.query('ROLLBACK');
+    response.status(500).json({ error: 'Rafraichissement impossible' });
+  } finally {
+    client.release();
+  }
+});
+
+// Deconnexion : on supprime le jeton de rafraichissement cote serveur. Le jeton
+// d'acces reste techniquement valide jusqu'a son expiration, mais il ne peut
+// plus etre renouvele - d'ou sa duree de quinze minutes.
+app.post('/auth/logout', async (request, response) => {
+  const { refreshToken } = request.body ?? {};
+
+  if (typeof refreshToken !== 'string' || refreshToken.length === 0) {
+    return response.status(400).json({ error: 'Jeton de rafraichissement requis' });
+  }
+
+  try {
+    await pool.query(
+      'UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1 AND revoked_at IS NULL',
+      [hashRefreshToken(refreshToken)],
+    );
+    // Toujours 204, que le jeton ait existe ou non : une reponse differente
+    // permettrait de tester la validite d'un jeton vole.
+    response.status(204).end();
+  } catch (_error) {
+    response.status(500).json({ error: 'Deconnexion impossible' });
   }
 });
 

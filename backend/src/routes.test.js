@@ -83,7 +83,7 @@ test('GET /health confirme que la base repond', { skip }, async () => {
 // Authentification
 // ---------------------------------------------------------------------------
 test('la creation d une equipe renvoie un jeton et un code a six chiffres', { skip }, () => {
-  assert.ok(lead.token);
+  assert.ok(lead.accessToken);
   assert.equal(lead.user.role, 'lead');
   assert.match(lead.team.joinCode, /^[0-9]{6}$/);
 });
@@ -99,7 +99,10 @@ test('un email deja utilise est refuse', { skip }, async () => {
 test('la connexion renvoie un jeton, un mauvais mot de passe non', { skip }, async () => {
   const ok = await call('/auth/login', { method: 'POST', body: { email: email('lead'), password } });
   assert.equal(ok.status, 200);
-  assert.ok((await ok.json()).token);
+
+  const session = await ok.json();
+  assert.ok(session.accessToken);
+  assert.ok(session.refreshToken);
 
   const ko = await call('/auth/login', {
     method: 'POST',
@@ -140,21 +143,21 @@ test('rejoindre avec le bon code cree un membre, pas un chef', { skip }, async (
   });
 
   assert.equal(response.status, 201);
-  const { user, token } = await response.json();
+  const { user, accessToken } = await response.json();
   assert.equal(user.role, 'member');
   assert.equal(user.teamId, lead.user.teamId);
 
   // Le code d'invitation ne doit jamais parvenir a un membre.
-  const team = await (await call('/team', { token })).json();
+  const team = await (await call('/team', { token: accessToken })).json();
   assert.equal(team.joinCode, null);
   assert.equal(team.members.length, 2);
 });
 
 test('seul le chef voit le code et peut le faire tourner', { skip }, async () => {
-  const avant = await (await call('/team', { token: lead.token })).json();
+  const avant = await (await call('/team', { token: lead.accessToken })).json();
   assert.equal(avant.joinCode, lead.team.joinCode);
 
-  const rotation = await call('/team/code', { method: 'POST', token: lead.token });
+  const rotation = await call('/team/code', { method: 'POST', token: lead.accessToken });
   assert.equal(rotation.status, 200);
 
   const { joinCode } = await rotation.json();
@@ -183,8 +186,81 @@ test('un membre ne peut pas faire tourner le code de l equipe', { skip }, async 
     await call('/auth/login', { method: 'POST', body: { email: email('membre'), password } })
   ).json();
 
-  const response = await call('/team/code', { method: 'POST', token: login.token });
+  const response = await call('/team/code', { method: 'POST', token: login.accessToken });
   assert.equal(response.status, 403);
+});
+
+// ---------------------------------------------------------------------------
+// Cycle de vie de la session
+// ---------------------------------------------------------------------------
+test('le rafraichissement rend une nouvelle paire et consomme l ancienne', { skip }, async () => {
+  const depart = await (
+    await call('/auth/login', { method: 'POST', body: { email: email('lead'), password } })
+  ).json();
+
+  const response = await call('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken: depart.refreshToken },
+  });
+  assert.equal(response.status, 200);
+
+  const renouvelee = await response.json();
+  assert.ok(renouvelee.accessToken);
+  assert.notEqual(renouvelee.refreshToken, depart.refreshToken, 'le jeton doit tourner');
+
+  // Le nouveau jeton d'acces ouvre bien les routes metier.
+  const tasks = await call('/tasks', { token: renouvelee.accessToken });
+  assert.equal(tasks.status, 200);
+});
+
+test('rejouer un jeton de rafraichissement coupe toute la session', { skip }, async () => {
+  const depart = await (
+    await call('/auth/login', { method: 'POST', body: { email: email('lead'), password } })
+  ).json();
+
+  const premiere = await (
+    await call('/auth/refresh', { method: 'POST', body: { refreshToken: depart.refreshToken } })
+  ).json();
+
+  // Rejouer le jeton deja consomme : c'est la signature d'une copie volee.
+  const rejeu = await call('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken: depart.refreshToken },
+  });
+  assert.equal(rejeu.status, 401);
+
+  // Consequence : meme le jeton legitime issu de la rotation est invalide.
+  const apres = await call('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken: premiere.refreshToken },
+  });
+  assert.equal(apres.status, 401, 'toute la session doit etre revoquee');
+});
+
+test('un jeton de rafraichissement inconnu est refuse', { skip }, async () => {
+  const response = await call('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken: 'jeton-qui-n-existe-pas' },
+  });
+  assert.equal(response.status, 401);
+});
+
+test('la deconnexion empeche tout rafraichissement ulterieur', { skip }, async () => {
+  const session = await (
+    await call('/auth/login', { method: 'POST', body: { email: email('lead'), password } })
+  ).json();
+
+  const logout = await call('/auth/logout', {
+    method: 'POST',
+    body: { refreshToken: session.refreshToken },
+  });
+  assert.equal(logout.status, 204);
+
+  const response = await call('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken: session.refreshToken },
+  });
+  assert.equal(response.status, 401, 'une session deconnectee ne se prolonge pas');
 });
 
 // ---------------------------------------------------------------------------
@@ -195,7 +271,7 @@ test('POST /tasks cree la tache avec sa couleur puis la retrouve', { skip }, asy
 
   const created = await call('/tasks', {
     method: 'POST',
-    token: lead.token,
+    token: lead.accessToken,
     body: { title, status: 'doing', color: '#22C55E' },
   });
   assert.equal(created.status, 201);
@@ -205,7 +281,7 @@ test('POST /tasks cree la tache avec sa couleur puis la retrouve', { skip }, asy
   assert.equal(task.status, 'doing');
   assert.equal(task.color, '#22C55E');
 
-  const tasks = await (await call('/tasks', { token: lead.token })).json();
+  const tasks = await (await call('/tasks', { token: lead.accessToken })).json();
   const found = tasks.find((item) => item.id === task.id);
   assert.ok(found, 'la tache creee doit apparaitre dans la liste');
   assert.equal(found.created_by_name, 'Chef de test');
@@ -218,7 +294,7 @@ test('POST /tasks refuse un statut ou une couleur invalides', { skip }, async ()
     { title: 'Couleur trop courte', color: '#FFF' },
     { title: '   ' },
   ]) {
-    const response = await call('/tasks', { method: 'POST', token: lead.token, body });
+    const response = await call('/tasks', { method: 'POST', token: lead.accessToken, body });
     assert.equal(response.status, 400, `payload accepte a tort : ${JSON.stringify(body)}`);
   }
 });
@@ -228,14 +304,14 @@ test('une equipe ne voit jamais les taches d une autre', { skip }, async () => {
 
   const created = await call('/tasks', {
     method: 'POST',
-    token: lead.token,
+    token: lead.accessToken,
     body: { title },
   });
   assert.equal(created.status, 201);
 
   // Meme application, meme base, jeton d'une autre equipe : le filtre vient du
   // jeton et non d'un parametre, il ne peut donc pas etre contourne.
-  const autres = await (await call('/tasks', { token: otherTeamLead.token })).json();
+  const autres = await (await call('/tasks', { token: otherTeamLead.accessToken })).json();
   assert.equal(
     autres.some((task) => task.title === title),
     false,
@@ -244,7 +320,7 @@ test('une equipe ne voit jamais les taches d une autre', { skip }, async () => {
 });
 
 test('GET /projects ne renvoie que les projets de l equipe', { skip }, async () => {
-  const response = await call('/projects', { token: lead.token });
+  const response = await call('/projects', { token: lead.accessToken });
   assert.equal(response.status, 200);
   // Une equipe fraichement creee n'a aucun projet : les projets de demo
   // appartiennent a l'equipe de demonstration, pas a celle-ci.
