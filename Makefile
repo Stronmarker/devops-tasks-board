@@ -15,7 +15,7 @@ COMPOSE := docker compose -f $(COMPOSE_FILE)
 K8S_DIR := infra/k8s
 
 .PHONY: help build start stop restart logs test test-frontend lint ci \
-        k8s-images k8s-init k8s-start k8s-status k8s-logs k8s-stop k8s-clean \
+        k8s-images k8s-init k8s-start k8s-status k8s-watch k8s-logs k8s-stop k8s-clean \
         db-reset db-bootstrap db-suppr reset clean
 
 help:
@@ -33,6 +33,7 @@ help:
 	@echo "  Kubernetes :"
 	@echo "  make k8s-start     Construire les images, appliquer les manifests, attendre les pods"
 	@echo "  make k8s-status    Etat des pods, services et volumes"
+	@echo "  make k8s-watch     Sonder /health en continu (pour la demo de resilience)"
 	@echo "  make k8s-logs      Suivre les logs du backend"
 	@echo "  make k8s-stop      Supprimer les deployments (le volume de donnees est conserve)"
 	@echo "  make k8s-clean     Tout supprimer, volume de donnees compris"
@@ -108,6 +109,12 @@ k8s-status:
 	@kubectl get pods
 	@echo ""
 	@kubectl get svc,pvc
+
+# Sonde /health chaque seconde. A lancer dans un terminal pendant qu'on
+# supprime un pod dans un autre : la colonne de 200 ininterrompue montre que le
+# service reste disponible pendant le remplacement.
+k8s-watch:
+	@./scripts/watch_health.sh
 
 k8s-logs:
 	kubectl logs -f deployment/backend

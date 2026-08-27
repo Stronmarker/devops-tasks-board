@@ -1,0 +1,736 @@
+<title>Conduite de soutenance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+
+<style>
+  :root {
+    --ground: #eaecef;
+    --surface: #ffffff;
+    --surface-2: #f3f6f8;
+    --ink: #141a21;
+    --ink-soft: #47535f;
+    --ink-faint: #74808c;
+    --line: #d2d9df;
+    --line-strong: #b6c0c8;
+    --accent: #1f5c73;
+    --accent-soft: #dde9ee;
+    --ochre: #9c6d1a;
+    --ok: #2f6b45;
+    --fail: #9e3a2b;
+    --shadow: 0 1px 2px rgba(20, 26, 33, .06), 0 8px 24px rgba(20, 26, 33, .05);
+
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #10161b;
+      --surface: #171f26;
+      --surface-2: #1d262e;
+      --ink: #e7ebef;
+      --ink-soft: #a5b0ba;
+      --ink-faint: #7c8993;
+      --line: #2a353e;
+      --line-strong: #3a4954;
+      --accent: #74bcd4;
+      --accent-soft: #16303b;
+      --ochre: #d9a34a;
+      --ok: #6fbf8c;
+      --fail: #e08272;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #10161b;
+    --surface: #171f26;
+    --surface-2: #1d262e;
+    --ink: #e7ebef;
+    --ink-soft: #a5b0ba;
+    --ink-faint: #7c8993;
+    --line: #2a353e;
+    --line-strong: #3a4954;
+    --accent: #74bcd4;
+    --accent-soft: #16303b;
+    --ochre: #d9a34a;
+    --ok: #6fbf8c;
+    --fail: #e08272;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.68;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: clamp(36px, 6vw, 76px) clamp(20px, 5vw, 48px) 96px;
+  }
+
+  header.doc { margin-bottom: 44px; }
+  .eyebrow {
+    margin: 0 0 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    margin: 0 0 16px;
+    font-family: var(--sans);
+    font-size: clamp(2.1rem, 5vw, 3.2rem);
+    font-weight: 700;
+    line-height: 1.06;
+    letter-spacing: -.025em;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 64ch;
+    margin: 0;
+    font-size: 1.08rem;
+    color: var(--ink-soft);
+    text-wrap: pretty;
+  }
+
+  h2 {
+    margin: 56px 0 6px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line-strong);
+    font-family: var(--sans);
+    font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+  }
+  h3 {
+    margin: 30px 0 8px;
+    font-family: var(--sans);
+    font-size: 1.06rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 15px; max-width: 68ch; }
+  strong { font-weight: 500; color: var(--ink); }
+  em { font-style: italic; }
+  .mono { font-family: var(--mono); font-size: .88em; }
+
+  /* Bloc de conduite : repere a gauche, texte a droite */
+  .beat {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: 26px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .beat:last-of-type { border-bottom: none; }
+  .cue { position: sticky; top: 20px; align-self: start; }
+  .cue .time {
+    display: block;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .cue .what {
+    display: block;
+    margin-top: 3px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  @media (max-width: 780px) {
+    .beat { grid-template-columns: 1fr; gap: 8px; }
+    .cue { position: static; }
+    .cue .time, .cue .what { display: inline; }
+    .cue .what::before { content: " · "; }
+  }
+
+  /* Texte a dire */
+  .say {
+    padding-left: 18px;
+    border-left: 3px solid var(--accent);
+  }
+  .say p:last-child { margin-bottom: 0; }
+
+  /* Action a faire */
+  .do {
+    margin-top: 14px;
+    padding: 12px 15px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font-family: var(--sans);
+    font-size: .9rem;
+    color: var(--ink-soft);
+  }
+  .do b {
+    display: block;
+    margin-bottom: 3px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ochre);
+  }
+
+  pre {
+    margin: 14px 0;
+    padding: 15px 17px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--ink-faint);
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: .82rem;
+    line-height: 1.7;
+    overflow-x: auto;
+    color: var(--ink-soft);
+  }
+  pre b { color: var(--ink); font-weight: 600; }
+  pre .ok { color: var(--ok); font-weight: 600; }
+  pre .ko { color: var(--fail); font-weight: 600; }
+  pre .dim { color: var(--ink-faint); }
+
+  .card {
+    margin: 18px 0;
+    padding: 18px 20px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+  }
+  .card h3 { margin-top: 0; }
+  .card p:last-child { margin-bottom: 0; }
+
+  .warn { border-left: 3px solid var(--ochre); }
+
+  .scroller { overflow-x: auto; margin: 18px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+  th, td { padding: 10px 13px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    font-family: var(--mono);
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .09em; text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom-color: var(--line-strong);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+
+  ul, ol { margin: 0 0 15px; padding-left: 1.2em; max-width: 68ch; }
+  li { margin-bottom: 7px; }
+  li::marker { color: var(--line-strong); }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .05em;
+  }
+  .pill-ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .pill-fail { color: var(--fail); background: color-mix(in srgb, var(--fail) 12%, transparent); }
+
+  .qa { margin-bottom: 26px; }
+  .qa .q {
+    font-family: var(--sans);
+    font-size: 1.02rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .qa .a { color: var(--ink-soft); max-width: 70ch; }
+  .qa .a p:last-child { margin-bottom: 0; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  @media print {
+    body { background: #fff; font-size: 11pt; }
+    .beat { break-inside: avoid; }
+    .cue { position: static; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="doc">
+    <p class="eyebrow">CESI · INFAL127 · INFAL245 · Conduite d'oral</p>
+    <h1>Ce que je dis, ce que je montre</h1>
+    <p class="lede">
+      Douze minutes de présentation, dont cinq de démonstration. Le texte est écrit pour être dit,
+      pas lu. Les repères de gauche donnent le temps écoulé et la diapositive en cours.
+    </p>
+  </header>
+
+  <h2>Avant d'entrer dans la salle</h2>
+
+  <div class="card warn">
+    <h3>À préparer une heure avant</h3>
+    <ol>
+      <li><strong>Réveiller Render.</strong> Le plan gratuit endort le service après 15 minutes.
+        Ouvrez l'application dans le navigateur et attendez qu'elle réponde, sinon le premier
+        chargement devant le jury prendra 50 secondes.</li>
+      <li><strong>Démarrer le cluster.</strong> <span class="mono">make k8s-start</span> puis
+        <span class="mono">make k8s-status</span> pour vérifier les 4 pods.</li>
+      <li><strong>Ouvrir quatre onglets</strong> : l'application Render, GitHub Actions,
+        le dépôt GitLab, et l'application du cluster sur <span class="mono">localhost:30080</span>.</li>
+      <li><strong>Préparer deux terminaux côte à côte</strong>, police agrandie, dans le dossier
+        du projet.</li>
+      <li><strong>Faire la démo une fois en entier</strong>, seul. Toutes les commandes de ce
+        document doivent avoir été tapées au moins une fois aujourd'hui.</li>
+    </ol>
+  </div>
+
+  <h2>Présentation</h2>
+
+  <div class="beat">
+    <div class="cue"><span class="time">0:00</span><span class="what">Diapo 1</span></div>
+    <div>
+      <div class="say">
+        <p>Bonjour. Je vais vous présenter le DevOps Tasks Board, une application de gestion de
+        tâches en équipe. Ce n'est pas l'application qui est intéressante, elle est volontairement
+        simple. Ce qui est intéressant, c'est le chemin qu'elle parcourt : de mon poste de
+        développement jusqu'à une production accessible en ligne, en passant par la
+        conteneurisation, l'orchestration et l'intégration continue.</p>
+        <p>Je terminerai par une démonstration en direct, et par trois pannes que j'ai réellement
+        rencontrées.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">0:45</span><span class="what">Diapo 2</span></div>
+    <div>
+      <div class="say">
+        <p>L'architecture est en trois tiers. Une interface React, une API Express, une base
+        PostgreSQL. La règle est simple : chaque étage ne parle qu'à son voisin. Le navigateur
+        n'atteint jamais la base. Seule l'API y accède, et elle est la seule à détenir les
+        identifiants de connexion.</p>
+        <p>Un point auquel je tiens : le schéma de la base est défini dans un seul fichier SQL.
+        Ce même fichier initialise la base en local, dans le cluster Kubernetes et en production.
+        Quand je modifie le schéma, je le modifie une fois.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">1:45</span><span class="what">Diapo 3</span></div>
+    <div>
+      <div class="say">
+        <p>Le même code source s'exécute de trois façons, pour trois usages différents.</p>
+        <p>En local, Docker Compose, avec le code monté depuis mon disque : je modifie un fichier,
+        il est actif dans la seconde. Dans le cluster Kubernetes, le code est figé dans une image,
+        et c'est là que je démontre l'orchestration. En production, Render, qui construit son propre
+        artefact à partir de mon dépôt.</p>
+        <p>Je veux souligner une limite tout de suite, avant qu'on me la trouve. Render n'utilise
+        ni mes Dockerfiles ni mes manifests Kubernetes. L'image que mon pipeline teste n'est donc
+        pas exactement celle qui tourne en production. Une chaîne mature publierait l'image sur un
+        registre et déploierait celle-là partout. C'est ce que je ferais avec plus de temps.</p>
+      </div>
+      <div class="do"><b>Effet recherché</b>
+        Annoncer soi-même la faiblesse désarme la question. Un jury qui découvre une limite que
+        vous aviez identifiée vous fait confiance sur le reste.
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">3:00</span><span class="what">Diapo 4</span></div>
+    <div>
+      <div class="say">
+        <p>Le pipeline se déclenche à chaque push. Six étages, et aucun ne démarre si le précédent
+        a échoué. Une régression ne peut donc pas atteindre la production.</p>
+        <p>D'abord l'analyse statique du code sur les deux paquets. Ensuite les tests du backend,
+        48 au total, dont des tests d'intégration qui tournent contre un vrai PostgreSQL démarré à
+        côté du job. Puis les tests du frontend, 18, qui montent réellement les composants dans un
+        DOM. Ensuite la construction des deux images Docker. Puis le déploiement, uniquement depuis
+        la branche principale.</p>
+        <p>Le dernier étage est celui auquel je tiens le plus. Il ne dit pas « déployé », il dit
+        « qui répond ». Il interroge la route de santé sur l'URL publique jusqu'à obtenir une réponse
+        saine. Et comme cette route exécute une vraie requête SQL, un déploiement n'est validé que
+        si l'application et sa base répondent toutes les deux.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">4:15</span><span class="what">Diapo 5</span></div>
+    <div>
+      <div class="say">
+        <p>L'authentification fonctionne par équipe. Une équipe est un espace fermé. On y entre de
+        deux façons : soit on la crée, et on en devient chef, soit on présente le code à six
+        chiffres que le chef a remis.</p>
+        <p>La session repose sur deux jetons. Un jeton d'accès qui vit quinze minutes et ne quitte
+        jamais la mémoire du navigateur. Et un jeton de rafraîchissement qui dure sept jours, stocké
+        en base côté serveur. C'est cette présence en base qui rend la déconnexion réelle : je
+        supprime la ligne, l'accès est coupé.</p>
+        <p>Chaque rafraîchissement consomme le jeton présenté et en émet un nouveau. Un jeton ne
+        sert donc jamais deux fois. Et si un jeton déjà consommé revient, c'est qu'une copie
+        circule. Impossible de savoir si c'est le voleur ou la victime qui l'envoie, alors je
+        révoque toute la session.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">5:45</span><span class="what">Diapo 6</span></div>
+    <div>
+      <div class="say">
+        <p>Voici les menaces que j'ai identifiées et ce que j'ai fait pour chacune.</p>
+        <p>La plus intéressante est le code d'équipe. Six chiffres, c'est un million de
+        combinaisons. Un script les épuise en quelques minutes. Le principe est bon, il est utilisé
+        par Slack ou Discord, mais la version brute est faible. J'ai donc limité à cinq tentatives
+        par quart d'heure, rendu le code renouvelable par le chef, et fait en sorte que l'API ne le
+        transmette jamais à un simple membre.</p>
+        <p>Il reste un risque que je n'ai pas traité, et c'est un choix, pas un oubli. Le jeton de
+        rafraîchissement est dans le stockage du navigateur, donc lisible par un script injecté.
+        Un cookie sécurisé y résisterait, mais mes deux services sont sur des domaines différents,
+        ce qui rendrait la configuration nettement plus fragile. J'ai préféré une chose qui marche
+        de façon fiable, avec le risque documenté.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">7:00</span><span class="what">Diapo 7</span></div>
+    <div>
+      <div class="say">
+        <p>Sur Kubernetes, je veux être franc : pour une application de cette taille, ce n'est pas
+        indispensable. Docker Compose suffirait.</p>
+        <p>Mais Kubernetes a eu un effet concret sur mon code. Le backend tourne en deux
+        exemplaires. Deux pods ne partagent pas leur mémoire. Une session stockée côté serveur
+        serait donc invisible d'un pod à l'autre, et je serais déconnecté une fois sur deux, au
+        hasard. C'est cette contrainte d'infrastructure qui m'a imposé une authentification sans
+        état.</p>
+        <p>Je ne l'ai pas décidé en lisant un article. Je l'ai déduit de mon fichier de
+        déploiement. Et je vais vous le montrer.</p>
+      </div>
+      <div class="do"><b>Effet recherché</b>
+        C'est le meilleur argument de la soutenance. Il prouve que vous avez compris le lien entre
+        l'infrastructure et le code, et non recopié des fichiers de configuration.
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">8:00</span><span class="what">Diapo 8</span></div>
+    <div>
+      <div class="say">
+        <p>Un mot sur la base. Le plan gratuit de Render supprime la base au bout de trente jours.
+        J'ai donc outillé la reprise : un script rejoue le schéma sur n'importe quelle base, et il
+        est idempotent, donc rejouable sans risque sur une base déjà remplie.</p>
+        <p>Ce script n'est pas théorique. C'est lui qui a migré ma base de production quand j'ai
+        ajouté l'authentification, sans interruption et sans perte de données.</p>
+        <p>Et parce que ces commandes peuvent atteindre la production, la plus destructive exige de
+        taper le mot « supprimer » en toutes lettres, et refuse de s'exécuter sans clavier. Aucun
+        pipeline ne peut la déclencher.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">9:00</span><span class="what">Diapo 9</span></div>
+    <div>
+      <div class="say">
+        <p>Trois pannes m'ont appris plus que le reste du projet.</p>
+        <p>La première, une page blanche en production. Le serveur renvoyait 200, le HTML, le CSS
+        et le JavaScript arrivaient correctement. Mais le bundle plantait au démarrage. J'ai perdu
+        du temps parce que je vérifiais avec curl, qui n'exécute jamais le JavaScript. La leçon :
+        un code 200 sur une application monopage ne prouve rien.</p>
+        <p>La deuxième, un service qui redémarrait en boucle. Une variable d'environnement avait
+        été mise dans un groupe non rattaché au service. Ce qui m'a sauvé, c'est que ma route de
+        santé teste vraiment la base : elle m'a dit « base indisponible » au lieu de « erreur 500 ».</p>
+        <p>La troisième est la plus instructive. Impossible de créer une équipe. Le backend était
+        correct, les tests passaient, la sécurité était bonne. Mais quatre erreurs différentes
+        renvoyaient le même message, et la règle du mot de passe n'était écrite nulle part.
+        L'application était irréprochable techniquement et inutilisable.</p>
+        <p>Le point commun des trois : ce que je vérifiais n'était pas ce qui comptait. Chacune a
+        produit un test qui l'aurait attrapée.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2>Démonstration</h2>
+
+  <p>Cinq minutes, dans cet ordre. Chaque étape répond à une question que le jury se pose.</p>
+
+  <div class="beat">
+    <div class="cue"><span class="time">10:30</span><span class="what">Render · navigateur</span></div>
+    <div>
+      <div class="say">
+        <p>Voici l'application en production. Sans compte, on ne voit qu'un écran de connexion :
+        aucune donnée n'est accessible.</p>
+        <p>Je me connecte en tant que chef d'équipe. Le tableau apparaît avec les données
+        préremplies, réparties en trois colonnes. À droite, le panneau d'équipe avec le code
+        d'invitation et la liste des membres.</p>
+        <p>J'ajoute une tâche, je lui donne une couleur, et je la fais avancer d'une colonne.</p>
+      </div>
+      <div class="do"><b>Réponse à</b>
+        « L'application fonctionne-t-elle vraiment en ligne ? »
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">11:15</span><span class="what">Terminal 1 · base</span></div>
+    <div>
+      <div class="say">
+        <p>Et je vérifie que c'est bien allé en base, dans PostgreSQL managé chez Render.</p>
+      </div>
+      <pre>set -a; source .env; set +a
+psql "$DATABASE_URL" -c \
+  "SELECT id, title, status, color FROM tasks ORDER BY id DESC LIMIT 3;"</pre>
+      <div class="do"><b>Réponse à</b>
+        « Les données sont-elles réellement persistées ? »
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">11:45</span><span class="what">Render · rôles</span></div>
+    <div>
+      <div class="say">
+        <p>Je me déconnecte et je reviens en tant que simple membre. Le code d'invitation a disparu,
+        et les boutons de déplacement et de suppression aussi.</p>
+        <p>Mais masquer un bouton ne protège rien. La vraie question, c'est ce qui se passe si
+        j'appelle l'API directement, sans passer par l'interface.</p>
+      </div>
+      <pre><span class="dim"># jeton d'un simple membre</span>
+M=$(curl -s -X POST https://devops-tasks-board-vhbm.onrender.com/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"membre@tasks.local","password":"Membre1234!"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['accessToken'])")
+
+<span class="dim"># tentative de suppression sur une route reservee au chef</span>
+curl -s -X DELETE https://devops-tasks-board-vhbm.onrender.com/tasks/1 \
+  -H "Authorization: Bearer $M"
+
+<span class="ko">{"error":"Reserve au chef d'equipe"}</span></pre>
+      <div class="say">
+        <p>Contourner l'interface ne contourne pas la règle. C'est le serveur qui décide.</p>
+      </div>
+      <div class="do"><b>Réponse à</b>
+        « Votre sécurité est-elle réelle ou seulement cosmétique ? »
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">12:30</span><span class="what">Kubernetes · 2 terminaux</span></div>
+    <div>
+      <div class="say">
+        <p>Passons au cluster. C'est la même application, mais servie par Kubernetes.</p>
+      </div>
+      <pre>kubectl get pods
+
+<b>backend-7c85dc95cd-tcczm</b>    1/1   Running
+<b>backend-7c85dc95cd-wnddz</b>    1/1   Running
+frontend-cfdbb7fb6-gdbzb   1/1   Running
+postgres-89bd8bb55-t9mrm   1/1   Running</pre>
+      <div class="say">
+        <p>Deux exemplaires du backend. Je lance une sonde qui interroge la santé de l'API chaque
+        seconde, et pendant qu'elle tourne, je tue brutalement un des deux pods.</p>
+      </div>
+      <pre><span class="dim"># terminal de gauche</span>
+make k8s-watch
+
+<span class="dim"># terminal de droite</span>
+kubectl delete pod backend-7c85dc95cd-tcczm</pre>
+      <div class="say">
+        <p>Regardez la colonne de gauche. Le pod est supprimé, le contrôleur en recrée un, et
+        l'API n'a pas cessé de répondre une seule seconde. C'est la seconde réplique qui a absorbé
+        le trafic pendant le remplacement.</p>
+      </div>
+      <pre>18:23:07  <span class="ok">HTTP 200</span>    30 ms
+18:23:08  <span class="ok">HTTP 200</span>    12 ms   <span class="dim">← pod supprime ici</span>
+18:23:09  <span class="ok">HTTP 200</span>    18 ms
+18:23:10  <span class="ok">HTTP 200</span>    17 ms
+
+<span class="dim">22 reponses, 0 indisponibilite</span></pre>
+      <div class="do"><b>Réponse à</b>
+        « Kubernetes est-il vraiment déployé, ou seulement écrit ? »
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">14:00</span><span class="what">GitHub Actions</span></div>
+    <div>
+      <div class="say">
+        <p>Et enfin le pipeline. Voici le dernier passage : analyse du code, tests, images, puis
+        déploiement, et la vérification finale qui confirme que la production répond.</p>
+      </div>
+      <div class="do"><b>Si le temps manque</b>
+        Cette étape est la plus facile à sacrifier. Un onglet ouvert sur un pipeline vert suffit
+        à la remplacer.
+      </div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="time">14:30</span><span class="what">Conclusion</span></div>
+    <div>
+      <div class="say">
+        <p>Ce que je retiens de ce projet, c'est que l'infrastructure n'est pas neutre. Elle
+        contraint le code. Deux répliques m'ont imposé une authentification sans état. Deux domaines
+        distincts m'ont imposé un jeton plutôt qu'un cookie. Trente jours de rétention m'ont imposé
+        un plan de reprise.</p>
+        <p>Je vous remercie, je suis à votre disposition pour vos questions.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2>Questions probables</h2>
+
+  <div class="qa">
+    <div class="q">Kubernetes était-il nécessaire ici ?</div>
+    <div class="a">
+      <p>Non, et je l'assume. Pour une application de cette taille, Docker Compose suffirait, et
+      Render n'utilise même pas mes manifests. Sa valeur ici est double : c'est une compétence
+      demandée par le sujet, et surtout, la contrainte des deux répliques a réellement déterminé
+      mon choix d'authentification. L'exercice a eu un effet concret sur mon code.</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q">Pourquoi un jeton plutôt qu'une session côté serveur ?</div>
+    <div class="a">
+      <p>Trois raisons, toutes liées à mon déploiement. Mes deux pods ne partagent pas leur mémoire.
+      Render éteint le service après quinze minutes d'inactivité, donc toute session en mémoire
+      mourrait au redémarrage. Et mon frontend et mon API sont sur deux domaines différents, ce qui
+      complique beaucoup les cookies.</p>
+      <p>Le prix à payer, c'est qu'un jeton d'accès ne se révoque pas avant son expiration. C'est
+      pour ça qu'il ne dure que quinze minutes, et que la révocation passe par le jeton de
+      rafraîchissement, lui stocké en base.</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q">Le jeton dans le navigateur, ce n'est pas dangereux ?</div>
+    <div class="a">
+      <p>Si, c'est le risque résiduel que j'ai identifié. Un script injecté pourrait lire le jeton
+      de rafraîchissement. J'ai réduit la surface : le jeton d'accès, lui, ne touche jamais le
+      disque. Un cookie sécurisé serait meilleur, mais entre deux domaines Render il impose une
+      configuration que je jugeais trop fragile pour le temps dont je disposais.</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q">Pourquoi <span class="mono">make</span> et pas les scripts demandés dans le sujet ?</div>
+    <div class="a">
+      <p>Un Makefile donne une entrée unique et documentée pour toutes les opérations, avec
+      <span class="mono">make help</span> qui les liste. Il gère les dépendances entre cibles, ce
+      qu'un script shell ne fait pas : <span class="mono">k8s-start</span> déclenche la construction
+      des images et la génération de la configuration avant d'appliquer les manifests.</p>
+      <p>Le comportement demandé est là, sous une forme que je considère plus maintenable. Le choix
+      est justifié par écrit dans le dépôt.</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q">Comment gérez-vous les secrets ?</div>
+    <div class="a">
+      <p>Différemment selon l'environnement. En local, dans le fichier Compose, avec des valeurs de
+      développement assumées comme publiques. Dans le cluster, un Secret Kubernetes. En production,
+      les variables d'environnement de la plateforme.</p>
+      <p>Un point important : un Secret Kubernetes n'est pas chiffré, il est seulement encodé en
+      base64. Pour de la vraie production j'utiliserais Sealed Secrets, SOPS ou un coffre externe
+      comme Vault. C'est écrit en commentaire dans le manifest.</p>
+      <p>Et le backend refuse de démarrer si la clé de signature est absente, plutôt que d'utiliser
+      une valeur par défaut qui serait dans le dépôt, donc connue de tous.</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q">Que testent réellement vos tests ?</div>
+    <div class="a">
+      <p>Trois niveaux. Des tests unitaires sur les briques de sécurité : hachage, salage,
+      falsification de jeton. Des tests d'intégration qui démarrent un vrai serveur HTTP contre une
+      vraie base, et qui vérifient notamment qu'une équipe ne voit jamais les données d'une autre.
+      Et des tests de composants qui montent l'interface dans un DOM.</p>
+      <p>Ce dernier niveau vient directement de la panne de page blanche. C'est le seul type de test
+      qui l'aurait détectée.</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q">Que se passe-t-il si votre base de production disparaît ?</div>
+    <div class="a">
+      <p>Je crée une nouvelle base, je mets à jour la variable de connexion du service, et je lance
+      une commande qui rejoue le schéma et les données. Quatre étapes documentées dans le README.
+      La procédure a déjà servi pour une migration réelle.</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q">Pourquoi Docker Desktop plutôt que Minikube ?</div>
+    <div class="a">
+      <p>Docker Desktop était déjà installé et intègre un cluster Kubernetes complet. Cela évitait
+      un second hyperviseur et un second démon Docker sur la machine. Les objets manipulés sont
+      exactement les mêmes : Deployments, Services, ConfigMaps, Secrets, sondes. Les manifests
+      fonctionneraient sur Minikube sans modification.</p>
+    </div>
+  </div>
+
+  <h2>Si quelque chose tourne mal</h2>
+
+  <div class="scroller">
+    <table>
+      <thead>
+        <tr><th>Symptôme</th><th>Cause probable</th><th>Quoi dire</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>L'application Render met 50 secondes à charger</td>
+          <td>Service endormi par le plan gratuit</td>
+          <td>« Le plan gratuit met le service en veille après quinze minutes. C'est un compromis
+          assumé pour un projet d'école. » Puis continuez à parler pendant le chargement.</td>
+        </tr>
+        <tr>
+          <td>Un pod affiche <span class="pill pill-fail">Pending</span></td>
+          <td>Cluster pas encore prêt</td>
+          <td><span class="mono">kubectl describe pod</span> devant le jury. Lire les événements à
+          voix haute est une démonstration de diagnostic, pas un aveu d'échec.</td>
+        </tr>
+        <tr>
+          <td>La connexion échoue en production</td>
+          <td>Migration non appliquée sur la base</td>
+          <td>Basculez sur la démonstration locale et annoncez-le. Ne restez jamais bloqué plus de
+          trente secondes sur un écran figé.</td>
+        </tr>
+        <tr>
+          <td>Le pipeline est rouge</td>
+          <td>Un test échoue sur le dernier commit</td>
+          <td>Ouvrez le job en échec et lisez l'erreur. Un pipeline rouge qui dit précisément ce qui
+          ne va pas prouve qu'il sert à quelque chose.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card warn">
+    <h3>La règle qui compte</h3>
+    <p>Si une démonstration échoue, ne la relancez pas trois fois. Dites ce qui devait se passer,
+    expliquez pourquoi vous pensez que ça a échoué, et passez à la suite. Un jury retient la
+    capacité à diagnostiquer, pas la perfection de la démonstration.</p>
+  </div>
+
+</div>
