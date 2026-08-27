@@ -33,13 +33,15 @@ export const pool = new Pool({
   ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
 });
 
+export const TASK_STATUSES = ['todo', 'doing', 'done'];
+
 export const TASK_COLORS = ['#6366F1', '#0EA5E9', '#22C55E', '#F97316', '#EF4444', '#A855F7'];
 
 export function validateTaskPayload(payload) {
   const { title, status = 'todo', color = TASK_COLORS[0] } = payload;
   return (
     Boolean(title?.trim()) &&
-    ['todo', 'doing', 'done'].includes(status) &&
+    TASK_STATUSES.includes(status) &&
     typeof color === 'string' &&
     /^#[0-9A-Fa-f]{6}$/.test(color)
   );
@@ -86,6 +88,13 @@ const refreshLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Trop de rafraichissements. Reessayez dans quelques minutes.' },
 });
+
+// Un identifiant d'URL est une chaine : sans cette verification, un appel a
+// /tasks/abc partirait en base et provoquerait une erreur SQL plutot qu'un 404.
+const readId = (value) => {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
 
 const publicUser = (row) => ({
   id: row.id,
@@ -400,6 +409,39 @@ app.post('/team/code', requireAuth, requireLead, async (request, response) => {
   }
 });
 
+// Retirer un membre de l'equipe. La suppression du compte emporte ses jetons de
+// rafraichissement (ON DELETE CASCADE) : la personne ne peut plus prolonger sa
+// session et perd l'acces des l'expiration de son jeton d'acces, soit au plus
+// quinze minutes. Ses taches restent au tableau, elles appartiennent a l'equipe.
+app.delete('/team/members/:id', requireAuth, requireLead, async (request, response) => {
+  const id = readId(request.params.id);
+
+  if (!id) {
+    return response.status(400).json({ error: 'Identifiant de membre invalide' });
+  }
+
+  // Un chef qui se retire laisserait une equipe sans personne pour gerer le
+  // code d'invitation ni les membres.
+  if (id === request.user.id) {
+    return response.status(400).json({ error: 'Vous ne pouvez pas vous retirer de votre equipe' });
+  }
+
+  try {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 AND team_id = $2', [
+      id,
+      request.user.teamId,
+    ]);
+
+    if (result.rowCount === 0) {
+      return response.status(404).json({ error: 'Membre introuvable' });
+    }
+
+    response.status(204).end();
+  } catch (_error) {
+    response.status(500).json({ error: 'Retrait impossible' });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Taches et projets - cloisonnes par equipe
 // ---------------------------------------------------------------------------
@@ -454,6 +496,64 @@ app.post('/tasks', requireAuth, async (request, response) => {
     response.status(201).json(result.rows[0]);
   } catch (_error) {
     response.status(500).json({ error: 'Unable to create task' });
+  }
+});
+
+// Deplacer une tache d'une colonne a l'autre. Reserve au chef d'equipe :
+// l'avancement du tableau est une decision de pilotage, pas une action
+// individuelle.
+app.patch('/tasks/:id', requireAuth, requireLead, async (request, response) => {
+  const id = readId(request.params.id);
+  const { status } = request.body ?? {};
+
+  if (!id) {
+    return response.status(400).json({ error: 'Identifiant de tache invalide' });
+  }
+
+  if (!TASK_STATUSES.includes(status)) {
+    return response.status(400).json({ error: 'Statut invalide' });
+  }
+
+  try {
+    // La clause team_id est ce qui empeche un chef de modifier la tache d'une
+    // autre equipe en devinant son identifiant.
+    const result = await pool.query(
+      `UPDATE tasks SET status = $1
+       WHERE id = $2 AND team_id = $3
+       RETURNING id, title, description, status, color, created_at`,
+      [status, id, request.user.teamId],
+    );
+
+    if (result.rowCount === 0) {
+      return response.status(404).json({ error: 'Tache introuvable' });
+    }
+
+    response.json(result.rows[0]);
+  } catch (_error) {
+    response.status(500).json({ error: 'Deplacement impossible' });
+  }
+});
+
+app.delete('/tasks/:id', requireAuth, requireLead, async (request, response) => {
+  const id = readId(request.params.id);
+
+  if (!id) {
+    return response.status(400).json({ error: 'Identifiant de tache invalide' });
+  }
+
+  try {
+    const result = await pool.query('DELETE FROM tasks WHERE id = $1 AND team_id = $2', [
+      id,
+      request.user.teamId,
+    ]);
+
+    if (result.rowCount === 0) {
+      return response.status(404).json({ error: 'Tache introuvable' });
+    }
+
+    response.status(204).end();
+  } catch (_error) {
+    response.status(500).json({ error: 'Suppression impossible' });
   }
 });
 

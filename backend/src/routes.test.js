@@ -30,6 +30,7 @@ let server;
 let baseUrl;
 let lead;
 let otherTeamLead;
+let member;
 
 const call = (path, { method = 'GET', token, body } = {}) =>
   fetch(`${baseUrl}${path}`, {
@@ -58,6 +59,18 @@ test.before(async () => {
 
   lead = await createTeam('lead', `Equipe test ${runId}`);
   otherTeamLead = await createTeam('autre', `Autre equipe ${runId}`);
+
+  member = await (
+    await call('/auth/join', {
+      method: 'POST',
+      body: {
+        code: lead.team.joinCode,
+        displayName: 'Membre de test',
+        email: email('membre'),
+        password,
+      },
+    })
+  ).json();
 });
 
 test.after(async () => {
@@ -132,23 +145,11 @@ test('rejoindre avec un code inconnu echoue', { skip }, async () => {
 });
 
 test('rejoindre avec le bon code cree un membre, pas un chef', { skip }, async () => {
-  const response = await call('/auth/join', {
-    method: 'POST',
-    body: {
-      code: lead.team.joinCode,
-      displayName: 'Membre de test',
-      email: email('membre'),
-      password,
-    },
-  });
-
-  assert.equal(response.status, 201);
-  const { user, accessToken } = await response.json();
-  assert.equal(user.role, 'member');
-  assert.equal(user.teamId, lead.user.teamId);
+  assert.equal(member.user.role, 'member');
+  assert.equal(member.user.teamId, lead.user.teamId);
 
   // Le code d'invitation ne doit jamais parvenir a un membre.
-  const team = await (await call('/team', { token: accessToken })).json();
+  const team = await (await call('/team', { token: member.accessToken })).json();
   assert.equal(team.joinCode, null);
   assert.equal(team.members.length, 2);
 });
@@ -182,11 +183,7 @@ test('un jeton invalide est refuse comme une absence de jeton', { skip }, async 
 });
 
 test('un membre ne peut pas faire tourner le code de l equipe', { skip }, async () => {
-  const login = await (
-    await call('/auth/login', { method: 'POST', body: { email: email('membre'), password } })
-  ).json();
-
-  const response = await call('/team/code', { method: 'POST', token: login.accessToken });
+  const response = await call('/team/code', { method: 'POST', token: member.accessToken });
   assert.equal(response.status, 403);
 });
 
@@ -297,6 +294,151 @@ test('POST /tasks refuse un statut ou une couleur invalides', { skip }, async ()
     const response = await call('/tasks', { method: 'POST', token: lead.accessToken, body });
     assert.equal(response.status, 400, `payload accepte a tort : ${JSON.stringify(body)}`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Actions reservees au chef d'equipe
+// ---------------------------------------------------------------------------
+const createTask = async (title, token = lead.accessToken) => {
+  const response = await call('/tasks', { method: 'POST', token, body: { title } });
+  assert.equal(response.status, 201, `creation de "${title}"`);
+  return response.json();
+};
+
+test('le chef deplace une tache d une colonne a l autre', { skip }, async () => {
+  const task = await createTask(`A deplacer ${runId}`);
+  assert.equal(task.status, 'todo');
+
+  const response = await call(`/tasks/${task.id}`, {
+    method: 'PATCH',
+    token: lead.accessToken,
+    body: { status: 'doing' },
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).status, 'doing');
+
+  const tasks = await (await call('/tasks', { token: lead.accessToken })).json();
+  assert.equal(tasks.find((item) => item.id === task.id).status, 'doing');
+});
+
+test('un membre ne peut ni deplacer ni supprimer une tache', { skip }, async () => {
+  const task = await createTask(`Protegee ${runId}`);
+
+  const deplacement = await call(`/tasks/${task.id}`, {
+    method: 'PATCH',
+    token: member.accessToken,
+    body: { status: 'done' },
+  });
+  assert.equal(deplacement.status, 403);
+
+  const suppression = await call(`/tasks/${task.id}`, { method: 'DELETE', token: member.accessToken });
+  assert.equal(suppression.status, 403);
+
+  // La tache doit etre intacte apres les deux tentatives.
+  const tasks = await (await call('/tasks', { token: lead.accessToken })).json();
+  assert.equal(tasks.find((item) => item.id === task.id).status, 'todo');
+});
+
+test('le chef supprime une tache', { skip }, async () => {
+  const task = await createTask(`A supprimer ${runId}`);
+
+  const response = await call(`/tasks/${task.id}`, { method: 'DELETE', token: lead.accessToken });
+  assert.equal(response.status, 204);
+
+  const tasks = await (await call('/tasks', { token: lead.accessToken })).json();
+  assert.equal(
+    tasks.some((item) => item.id === task.id),
+    false,
+  );
+});
+
+test('un statut inconnu ou un identifiant absurde sont refuses', { skip }, async () => {
+  const task = await createTask(`Statut ${runId}`);
+
+  const statut = await call(`/tasks/${task.id}`, {
+    method: 'PATCH',
+    token: lead.accessToken,
+    body: { status: 'archive' },
+  });
+  assert.equal(statut.status, 400);
+
+  const identifiant = await call('/tasks/abc', {
+    method: 'PATCH',
+    token: lead.accessToken,
+    body: { status: 'done' },
+  });
+  assert.equal(identifiant.status, 400);
+});
+
+test('le chef d une equipe ne touche pas aux taches d une autre', { skip }, async () => {
+  const task = await createTask(`Cloisonnee ${runId}`);
+
+  // Identifiant connu, mais jeton d'une autre equipe : la clause team_id doit
+  // faire echouer la requete comme si la tache n'existait pas.
+  const deplacement = await call(`/tasks/${task.id}`, {
+    method: 'PATCH',
+    token: otherTeamLead.accessToken,
+    body: { status: 'done' },
+  });
+  assert.equal(deplacement.status, 404);
+
+  const suppression = await call(`/tasks/${task.id}`, {
+    method: 'DELETE',
+    token: otherTeamLead.accessToken,
+  });
+  assert.equal(suppression.status, 404);
+});
+
+test('le chef retire un membre, qui perd aussitot sa session', { skip }, async () => {
+  const sortant = await (
+    await call('/auth/join', {
+      method: 'POST',
+      body: {
+        code: lead.team.joinCode,
+        displayName: 'Membre sortant',
+        email: email('sortant'),
+        password,
+      },
+    })
+  ).json();
+
+  const response = await call(`/team/members/${sortant.user.id}`, {
+    method: 'DELETE',
+    token: lead.accessToken,
+  });
+  assert.equal(response.status, 204);
+
+  const team = await (await call('/team', { token: lead.accessToken })).json();
+  assert.equal(
+    team.members.some((m) => m.id === sortant.user.id),
+    false,
+  );
+
+  // Ses jetons de rafraichissement partent avec le compte : il ne peut plus
+  // prolonger sa session au-dela de son jeton d'acces en cours.
+  const refresh = await call('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken: sortant.refreshToken },
+  });
+  assert.equal(refresh.status, 401);
+});
+
+test('un membre ne peut pas en retirer un autre', { skip }, async () => {
+  const response = await call(`/team/members/${lead.user.id}`, {
+    method: 'DELETE',
+    token: member.accessToken,
+  });
+  assert.equal(response.status, 403);
+});
+
+test('le chef ne peut pas se retirer lui-meme', { skip }, async () => {
+  const response = await call(`/team/members/${lead.user.id}`, {
+    method: 'DELETE',
+    token: lead.accessToken,
+  });
+
+  // Sinon l'equipe se retrouverait sans personne pour gerer le code ni les membres.
+  assert.equal(response.status, 400);
 });
 
 test('une equipe ne voit jamais les taches d une autre', { skip }, async () => {
