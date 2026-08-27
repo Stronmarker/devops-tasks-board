@@ -2,8 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   generateJoinCode,
+  generateRefreshToken,
   hashPassword,
-  signToken,
+  hashRefreshToken,
+  refreshExpiryDate,
+  REFRESH_TTL_DAYS,
+  signAccessToken,
   validateCredentialsPayload,
   validateEmail,
   validateJoinCode,
@@ -80,7 +84,7 @@ test('deux hachages du meme mot de passe different (sel aleatoire)', async () =>
 });
 
 test('le jeton transporte l identite et l equipe', () => {
-  const token = signToken({ id: 7, team_id: 3, role: 'lead', display_name: 'Chef' });
+  const token = signAccessToken({ id: 7, team_id: 3, role: 'lead', display_name: 'Chef' });
   const payload = verifyToken(token);
 
   assert.equal(payload.sub, '7');
@@ -88,8 +92,41 @@ test('le jeton transporte l identite et l equipe', () => {
   assert.equal(payload.role, 'lead');
 });
 
+test('un jeton de rafraichissement est long, aleatoire et opaque', () => {
+  const jetons = new Set();
+  for (let i = 0; i < 100; i += 1) {
+    const token = generateRefreshToken();
+    // 32 octets en base64url : indevinable, et sans structure lisible
+    // contrairement a un JWT dont la charge utile se decode a vue.
+    assert.ok(token.length >= 42, `jeton trop court : ${token.length}`);
+    assert.equal(token.includes('.'), false);
+    jetons.add(token);
+  }
+  assert.equal(jetons.size, 100, 'les jetons doivent tous differer');
+});
+
+test('seule l empreinte du jeton de rafraichissement est stockable', () => {
+  const token = generateRefreshToken();
+  const empreinte = hashRefreshToken(token);
+
+  assert.match(empreinte, /^[0-9a-f]{64}$/, 'SHA-256 en hexadecimal');
+  assert.notEqual(empreinte, token);
+  // Deterministe : c'est ce qui permet de retrouver la ligne en base par index.
+  assert.equal(hashRefreshToken(token), empreinte);
+  assert.notEqual(hashRefreshToken(generateRefreshToken()), empreinte);
+});
+
+test('la date d expiration du rafraichissement est a sept jours', () => {
+  const maintenant = new Date('2026-08-27T10:00:00Z');
+  const expiration = refreshExpiryDate(maintenant);
+  const jours = (expiration - maintenant) / (24 * 60 * 60 * 1000);
+
+  assert.equal(jours, REFRESH_TTL_DAYS);
+  assert.equal(jours, 7);
+});
+
 test('un jeton modifie est rejete', () => {
-  const token = signToken({ id: 7, team_id: 3, role: 'member', display_name: 'Membre' });
+  const token = signAccessToken({ id: 7, team_id: 3, role: 'member', display_name: 'Membre' });
   const [entete, charge, signature] = token.split('.');
 
   // On remplace la charge utile par un role d'administrateur en gardant la

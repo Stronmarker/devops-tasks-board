@@ -6,7 +6,13 @@ import jwt from 'jsonwebtoken';
 // lent pour rendre une attaque par dictionnaire couteuse, assez rapide pour ne
 // pas degrader la connexion d'un utilisateur legitime.
 const SALT_ROUNDS = 12;
-const TOKEN_TTL = '8h';
+
+// Le jeton d'acces est volontairement tres court : c'est lui qui circule a
+// chaque requete, donc lui qui risque d'etre intercepte. 15 minutes bornent les
+// degats d'un vol. Le jeton de rafraichissement, lui, ne sort du navigateur que
+// pour en obtenir un nouveau.
+export const ACCESS_TTL = '15m';
+export const REFRESH_TTL_DAYS = 7;
 
 // Aucune valeur par defaut n'est prevue : un secret code en dur serait present
 // dans le depot, donc connu de tous, et signerait des jetons falsifiables.
@@ -71,12 +77,27 @@ export function verifyPassword(password, hash) {
   return bcrypt.compare(password, hash);
 }
 
-export function signToken(user) {
+export function signAccessToken(user) {
   return jwt.sign(
     { sub: String(user.id), teamId: user.team_id, role: user.role, name: user.display_name },
     JWT_SECRET,
-    { expiresIn: TOKEN_TTL },
+    { expiresIn: ACCESS_TTL },
   );
+}
+
+// Jeton de rafraichissement : une valeur opaque, pas un JWT. Il n'a rien a
+// transporter puisque le serveur le retrouve en base ; 256 bits aleatoires
+// suffisent et rendent la valeur indevinable.
+export function generateRefreshToken() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+export function hashRefreshToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+export function refreshExpiryDate(now = new Date()) {
+  return new Date(now.getTime() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000);
 }
 
 export function verifyToken(token) {
