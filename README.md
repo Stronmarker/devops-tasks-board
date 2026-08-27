@@ -38,11 +38,35 @@ Sans compte, aucune route métier ne répond autre chose que `401`.
 | --- | --- | --- |
 | `POST /auth/teams` | Public | Crée une équipe et son chef, renvoie le code d'invitation |
 | `POST /auth/join` | Public + code | Crée un membre dans l'équipe correspondant au code |
-| `POST /auth/login` | Public | Renvoie un jeton JWT valable 8 heures |
-| `GET /auth/me` | Jeton | Valide le jeton et renvoie l'identité |
-| `GET /team` | Jeton | Membres de l'équipe ; le code n'est renvoyé qu'au chef |
-| `POST /team/code` | Jeton + rôle chef | Remplace le code d'invitation |
-| `GET`/`POST /tasks`, `GET /projects` | Jeton | Cloisonnés sur l'équipe du jeton |
+| `POST /auth/login` | Public | Renvoie la paire de jetons |
+| `POST /auth/refresh` | Jeton de rafraîchissement | Échange le jeton contre une nouvelle paire |
+| `POST /auth/logout` | Jeton de rafraîchissement | Révoque la session côté serveur |
+| `GET /auth/me` | Jeton d'accès | Valide le jeton et renvoie l'identité |
+| `GET /team` | Jeton d'accès | Membres de l'équipe ; le code n'est renvoyé qu'au chef |
+| `POST /team/code` | Jeton d'accès + rôle chef | Remplace le code d'invitation |
+| `GET`/`POST /tasks`, `GET /projects` | Jeton d'accès | Cloisonnés sur l'équipe du jeton |
+
+### Deux jetons, deux rôles
+
+| | Durée | Où il vit | Ce qu'il fait |
+| --- | --- | --- | --- |
+| Accès | 15 minutes | Mémoire du navigateur, jamais sur le disque | Accompagne chaque requête |
+| Rafraîchissement | 7 jours | `localStorage`, **et en base côté serveur** | Sert uniquement à obtenir une nouvelle paire |
+
+Un seul jeton de longue durée poserait un problème simple : volé, il ouvrirait l'application
+jusqu'à son expiration, sans recours. La paire ramène cette fenêtre à quinze minutes et rend
+la déconnexion réelle — supprimer la ligne en base coupe l'accès, ce qu'un jeton purement
+signé ne permet pas.
+
+**Rotation et détection de réutilisation.** Chaque rafraîchissement consomme le jeton présenté
+et en émet un nouveau. Un jeton ne sert donc jamais deux fois. Si un jeton déjà consommé
+revient, c'est qu'une copie circule : impossible de distinguer le voleur de la victime, alors
+**toute la session de l'utilisateur est révoquée** et il doit se reconnecter. Vérifié par un
+test d'intégration.
+
+Le frontend rejoue automatiquement une requête reçue en `401` après avoir rafraîchi son jeton :
+l'utilisateur ne voit rien. Les rafraîchissements concurrents sont sérialisés, sinon deux
+onglets présenteraient le même jeton et déclencheraient la détection de réutilisation.
 
 ### Choix de sécurité
 
@@ -60,14 +84,20 @@ Sans compte, aucune route métier ne répond autre chose que `401`.
   restent valides, seul l'ancien code cesse d'ouvrir la porte.
 - **`JWT_SECRET` obligatoire** : le backend refuse de démarrer sans lui plutôt que d'utiliser
   une valeur par défaut qui, présente dans le dépôt, rendrait tous les jetons falsifiables.
+- **Jetons de rafraîchissement stockés hachés** (SHA-256) : une fuite de la base ne donnerait
+  aucun jeton utilisable. SHA-256 suffit ici, contrairement aux mots de passe — le jeton est
+  fait de 256 bits tirés au hasard, il n'y a rien à deviner par dictionnaire.
 - **En-têtes HTTP** posés par Helmet, et corps de requête limité à 100 ko.
 
 ### Faiblesse assumée
 
-Le jeton est conservé dans le `localStorage` du navigateur : un script injecté dans la page
-pourrait le lire. Un cookie `httpOnly` y résisterait, mais le frontend et l'API sont déployés
-sur deux domaines Render distincts, ce qui impose `SameSite=None`, `Secure` et une
-configuration CORS nettement plus fragile. Ce compromis est documenté dans `docs/decisions.md`.
+Le jeton de rafraîchissement est conservé dans le `localStorage` : un script injecté dans la
+page pourrait le lire. Un cookie `httpOnly` y résisterait, mais le frontend et l'API sont
+déployés sur deux domaines Render distincts, ce qui impose `SameSite=None`, `Secure` et une
+configuration CORS nettement plus fragile.
+
+Le jeton d'accès, lui, ne touche jamais le disque — il vit dans la mémoire du module et
+disparaît à la fermeture de l'onglet. Ce compromis est documenté dans `docs/decisions.md`.
 
 ## Commandes Make
 
@@ -90,10 +120,10 @@ configuration CORS nettement plus fragile. Ce compromis est documenté dans `doc
 
 | Fichier | Type | Ce qui est vérifié |
 | --- | --- | --- |
-| `backend/src/auth.test.js` | Unitaire | Hachage bcrypt, salage, signature et falsification de jeton, format et imprévisibilité des codes d'équipe |
+| `backend/src/auth.test.js` | Unitaire | Hachage bcrypt, salage, signature et falsification de jeton, imprévisibilité des codes d'équipe et des jetons de rafraîchissement |
 | `backend/src/server.test.js` | Unitaire | Validation des tâches : titre requis, statut autorisé, couleur hexadécimale stricte |
-| `backend/src/routes.test.js` | Intégration | Chaîne complète sur une vraie base : inscription, connexion, `401` sans jeton, `403` sur une action réservée au chef, et **absence de fuite entre deux équipes** |
-| `frontend/src/App.test.jsx` | Composant | Écran de connexion, ouverture du tableau, code masqué aux membres, déconnexion sur `401`, couleur transmise à l'API |
+| `backend/src/routes.test.js` | Intégration | Chaîne complète sur une vraie base : inscription, connexion, rotation des jetons, **détection de réutilisation**, déconnexion, `401` sans jeton, `403` sur une action réservée au chef, et **absence de fuite entre deux équipes** |
+| `frontend/src/App.test.jsx` | Composant | Écran de connexion, ouverture du tableau, code masqué aux membres, **rejeu transparent d'une requête après rafraîchissement**, retour à la connexion si la session est révoquée, couleur transmise à l'API |
 
 Les tests d'intégration ont besoin d'une base PostgreSQL joignable. Ils sont ignorés
 explicitement si `DATABASE_URL` ne répond pas, et toujours exécutés dans le pipeline,
@@ -143,7 +173,7 @@ que Render redéploie via son auto-deploy natif et n'échoue pas.
 | `PORT` | backend | Port d'écoute de l'API |
 | `DATABASE_URL` | backend | Connexion PostgreSQL complète, identifiants compris |
 | `DATABASE_SSL` | backend | Force le TLS vers PostgreSQL même si l'URL ne le réclame pas |
-| `JWT_SECRET` | backend | **Obligatoire.** Clé de signature des jetons. Générer une valeur par environnement : `openssl rand -base64 48` |
+| `JWT_SECRET` | backend | **Obligatoire.** Clé de signature des jetons d'accès. Générer une valeur par environnement : `openssl rand -base64 48` |
 | `VITE_API_URL` | frontend | URL publique de l'API, compilée dans le bundle au build |
 
 Le modèle est dans [backend/.env.example](backend/.env.example). Les valeurs réelles vivent
