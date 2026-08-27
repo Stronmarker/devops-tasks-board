@@ -77,7 +77,11 @@ CREATE TABLE IF NOT EXISTS tasks (
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id    INTEGER REFERENCES teams(id) ON DELETE CASCADE;
 ALTER TABLE tasks    ADD COLUMN IF NOT EXISTS team_id    INTEGER REFERENCES teams(id) ON DELETE CASCADE;
 ALTER TABLE tasks    ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
-ALTER TABLE tasks    ADD COLUMN IF NOT EXISTS color      VARCHAR(7) NOT NULL DEFAULT '#6366F1';
+ALTER TABLE tasks    ADD COLUMN IF NOT EXISTS color      VARCHAR(7) NOT NULL DEFAULT '#EC4899';
+
+-- ADD COLUMN IF NOT EXISTS ne s'applique pas a une colonne deja creee : sur une
+-- base existante, seule cette ligne met la valeur par defaut a jour.
+ALTER TABLE tasks    ALTER COLUMN color SET DEFAULT '#EC4899';
 
 -- La couleur est une decoration : elle vient en plus du statut, jamais a sa
 -- place. Le format est contraint pour qu'une valeur arbitraire ne puisse pas
@@ -132,7 +136,7 @@ FROM (VALUES
     ('Mettre en place un livenessProbe','Sonde HTTP /health sur le backend',             'doing', '#0EA5E9', 'Observabilite'),
     ('Externaliser les secrets',        'Deplacer les mots de passe dans un Secret K8s', 'todo',  '#EF4444', 'Securite applicative'),
     ('Builder les images Docker',       'Job build_docker_images dans le pipeline',      'done',  '#22C55E', 'Pipeline CI/CD'),
-    ('Deployer sur Render',             'Web Service backend + frontend',                'todo',  '#6366F1', 'Pipeline CI/CD')
+    ('Deployer sur Render',             'Web Service backend + frontend',                'todo',  '#EC4899', 'Pipeline CI/CD')
 ) AS v(title, description, status, color, project_name)
 JOIN projects p ON p.name = v.project_name
 JOIN teams    t ON t.join_code = '482913'

@@ -5,12 +5,14 @@ import ConfirmButton from './ConfirmButton.jsx';
 // Palette proposee a l'utilisateur. Le backend revalide la valeur recue : une
 // couleur choisie ailleurs que dans cette liste est rejetee cote serveur.
 const COLORS = [
-  { value: '#6366F1', name: 'Indigo' },
+  { value: '#EC4899', name: 'Rose' },
   { value: '#0EA5E9', name: 'Bleu' },
   { value: '#22C55E', name: 'Vert' },
+  { value: '#EAB308', name: 'Jaune' },
   { value: '#F97316', name: 'Orange' },
   { value: '#EF4444', name: 'Rouge' },
   { value: '#A855F7', name: 'Violet' },
+  { value: '#92400E', name: 'Marron' },
 ];
 
 const COLUMNS = [

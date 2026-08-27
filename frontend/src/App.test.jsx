@@ -364,6 +364,23 @@ describe('Session active', () => {
     );
   });
 
+  it('propose la palette a jour, sans l ancienne couleur indigo', async () => {
+    mockApi({
+      ...REFRESH_OK,
+      '/auth/me': { body: { user: LEAD, team: { name: 'Lab' } } },
+      '/team': { body: TEAM_LEAD },
+      '/tasks': { body: [] },
+    });
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByLabelText('Nouvelle tache')).toBeDefined());
+
+    for (const nom of ['Rose', 'Bleu', 'Vert', 'Jaune', 'Orange', 'Rouge', 'Violet', 'Marron']) {
+      expect(screen.getByLabelText(nom), nom).toBeDefined();
+    }
+    expect(screen.queryByLabelText('Indigo')).toBeNull();
+  });
+
   it('envoie la couleur choisie lors de la creation d une tache', async () => {
     const fetchMock = mockApi({
       ...REFRESH_OK,

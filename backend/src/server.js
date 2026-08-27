@@ -35,7 +35,20 @@ export const pool = new Pool({
 
 export const TASK_STATUSES = ['todo', 'doing', 'done'];
 
-export const TASK_COLORS = ['#6366F1', '#0EA5E9', '#22C55E', '#F97316', '#EF4444', '#A855F7'];
+// Palette proposee par l'interface. Elle sert de reference aux tests et fournit
+// la couleur par defaut ; la validation, elle, accepte tout code hexadecimal
+// valide, ce qui evite de casser les taches deja enregistrees quand la palette
+// evolue.
+export const TASK_COLORS = [
+  '#EC4899', // rose
+  '#0EA5E9', // bleu
+  '#22C55E', // vert
+  '#EAB308', // jaune
+  '#F97316', // orange
+  '#EF4444', // rouge
+  '#A855F7', // violet
+  '#92400E', // marron
+];
 
 export function validateTaskPayload(payload) {
   const { title, status = 'todo', color = TASK_COLORS[0] } = payload;
