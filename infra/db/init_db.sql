@@ -34,6 +34,25 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_team_id ON users(team_id);
 
+-- Jetons de rafraichissement. Leur presence en base est ce qui rend la
+-- deconnexion reelle : supprimer la ligne coupe l'acces, ce qu'un jeton
+-- purement signe ne permet pas.
+--
+-- On stocke une empreinte SHA-256, jamais le jeton lui-meme : une fuite de la
+-- base ne donnerait alors aucun jeton utilisable. SHA-256 suffit ici, contrairement
+-- aux mots de passe : le jeton fait 256 bits tires au hasard, il n'y a rien a
+-- deviner par dictionnaire, et une empreinte simple reste indexable.
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash CHAR(64)    NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+
 -- ---------------------------------------------------------------------
 -- Projets et taches
 -- ---------------------------------------------------------------------
